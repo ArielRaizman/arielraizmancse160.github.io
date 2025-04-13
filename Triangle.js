@@ -59,3 +59,63 @@ function drawTriangle(gl,vertices) {
     gl.drawArrays(gl.TRIANGLES, 0, n);
   }
   
+  function drawPicture() {
+    gl.clear(gl.COLOR_BUFFER_BIT);
+
+    //mountain
+    gl.uniform4f(u_FragColor, 0.6, 0.3, 0.0, 1.0); 
+    drawTriangle(gl, [0.0, 0.7, -0.6, -0.5, 0.6, -0.5]);
+
+    // snow
+    gl.uniform4f(u_FragColor, 0.9, 0.9, 0.9, 1.0); 
+    drawTriangle(gl, [0.0, 0.7, -0.2, 0.3, 0.2, 0.3]);
+
+    // spikey snow
+    gl.uniform4f(u_FragColor, 0.9, 0.9, 0.9, 1.0); 
+    drawTriangle(gl, [-0.2, 0.2, -0.2, 0.3, 0.0, 0.3]);
+
+    gl.uniform4f(u_FragColor, 0.9, 0.9, 0.9, 1.0); 
+    drawTriangle(gl, [0.2, 0.2, 0.2, 0.3, 0.0, 0.3]);
+
+
+    // left tree
+    drawTree(-0.6, -0.6); 
+
+    // right tree
+    drawTree(0.6, -0.6); 
+
+    drawStar(0.5, 0.8, 0.03); 
+    drawStar(0.4, 0.5, 0.04); 
+    drawStar(0.7, 0.6, 0.02); 
+    drawStar(0.6, 0.3, 0.03);
+    drawStar(-0.5, 0.8, 0.04);
+    drawStar(-0.4, 0.5, 0.02);
+    drawStar(-0.7, 0.6, 0.03);
+    drawStar(-0.6, 0.3, 0.03);
+    drawStar(-0.2, 0.9, 0.02);
+    drawStar(0.2, 0.9, 0.03);
+
+}
+
+function drawTree(x, y) {
+    // trunk
+    gl.uniform4f(u_FragColor, 0.5, 0.25, 0.0, 1.0);
+    drawTriangle(gl, [x - 0.1, y, x + 0.1, y, x, y + 0.3]); 
+
+    // leaves
+    gl.uniform4f(u_FragColor, 0.0, 0.5, 0.0, 1.0);
+
+    drawTriangle(gl, [x - 0.3, y + 0.3, x + 0.3, y + 0.3, x, y + 0.45]);  
+    drawTriangle(gl, [x - 0.25, y + 0.45, x + 0.25, y + 0.45, x, y + 0.6]);  
+    drawTriangle(gl, [x - 0.2, y + 0.6, x + 0.2, y + 0.6, x, y + 0.75]); 
+}
+
+function drawStar(x, y, size) {
+  // triangle
+  gl.uniform4f(u_FragColor, 0.9, 0.9, 0.4, 1.0);
+  drawTriangle(gl, [x, y + size, x - size, y - size, x + size, y - size]);
+
+  // upside down triangle
+  gl.uniform4f(u_FragColor, 0.9, 0.9, 0.4, 1.0); 
+    drawTriangle(gl, [x, y - size * 1.5, x - size, y + size * 0.5, x + size, y + size * 0.5]);
+}

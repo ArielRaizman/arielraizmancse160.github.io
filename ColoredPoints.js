@@ -73,10 +73,12 @@ function htmlUI() {
   document.getElementById('green').onclick = function() { g_selectedColor = [0.0,1.0,0.0,1.0]; };
   document.getElementById('red').onclick = function() { g_selectedColor = [1.0,0.0,0.0,1.0]; };
   document.getElementById('clear').onclick = function() { g_shapes = []; renderShapes(); };
+  document.getElementById('drawing').onclick = function() { drawPicture(); };
 
   document.getElementById('point').onclick = function() { g_selectedType =POINT};
   document.getElementById('triangle').onclick = function() { g_selectedType =TRIANGLE };
   document.getElementById('circle').onclick = function() { g_selectedType =CIRCLE };
+  document.getElementById('etch').onclick = function() { etchASketch(); };
 
   //sliders
   document.getElementById('redslide').addEventListener('mouseup', function() { g_selectedColor[0] = this.value/100; });
@@ -135,7 +137,9 @@ function renderShapes() {
 }
 
 function click(ev) {
-  
+  etchMode = false; 
+  document.removeEventListener('keydown', handleEtchKeyPress);
+  sendTextToHTML("isetch", "");
   // Get the coordinates of a mouse press
   [x,y] = coordsToGL(ev);
   // Store the coordinates to g_points array
@@ -175,4 +179,48 @@ function click(ev) {
 
 function sendTextToHTML(id, text) {
   document.getElementById(id).innerHTML = text;
+}
+
+let etchPosition = [0.0, 0.0]; // Start at the center of the canvas
+let etchMode = false; // Flag to track if etch-a-sketch mode is active
+
+function etchASketch() {
+  gl.clear(gl.COLOR_BUFFER_BIT);
+
+  etchPosition = [0.0, 0.0]; 
+  drawEtchPoint();
+
+  etchMode = true;
+  sendTextToHTML("isetch", "Etch-a-Sketch mode is ON! Press 'w', and 's' to move vertically, and the left and right arrow keys to move horizontally :)");
+  document.addEventListener('keydown', handleEtchKeyPress);
+}
+
+function handleEtchKeyPress(event) {
+  if (!etchMode) {
+    return;
+  } 
+
+  const step = 0.05;
+
+  if (event.key === 'w') {
+    etchPosition[1] += step; 
+  } else if (event.key === 's') {
+    etchPosition[1] -= step; 
+  } else if (event.key === 'ArrowLeft') {
+    etchPosition[0] -= step; 
+  } else if (event.key === 'ArrowRight') {
+    etchPosition[0] += step; 
+  }
+
+  drawEtchPoint();
+}
+
+function drawEtchPoint() {
+  let point = new Point();
+  point.position = [...etchPosition, 0.0]; 
+  point.color = [...g_selectedColor];
+  point.size = g_selectedSize;
+
+  g_shapes.push(point);
+  renderShapes();
 }
