@@ -16,23 +16,17 @@
 
     <br />
     <p id="perf">XXX</p>
-    <button id="green">green</button>
-    <button id="red">red</button>
-    <button id="clear">clear</button>
-    <button id="point">point</button>
-    <button id="triangle">triangle</button>
-    <button id="circle">circle</button>
-    <button id="drawing">render drawing</button>
-    <button id="etch">Etch A Sketch :) </button>
-    <p id="isetch"></p>
+    <button id="on">ON</button>
+    <button id="off">OFF</button>
 
 
 
     red<input type="range" min="0" max= "100" value="100" class="slider" id="redslide" />
     green<input type="range" min="0" max= "100" value="0" class="slider" id="greenslide" />
     blue<input type="range" min="0" max= "100" value="0" class="slider" id="blueslide" />
-    size<input type="range" min="5" max= "40" value="10" class="slider" id="sizeslide" />
-    segments<input type="range" min="3" max= "100" value="10" class="slider" id="segmentslide" />
+    joint <input type="range" min="-90" max= "90" value="0" class="slider" id="jointslide" />
+    purple joint <input type="range" min="-90" max= "90" value="0" class="slider" id="purplejointslide" />
+    camera angle<input type="range" min="0" max= "90" value="0" class="slider" id="angleslide" />
   </span>
       <script src="../lib/webgl-utils.js"></script>
       <script src="../lib/webgl-debug.js"></script>
