@@ -1,3 +1,6 @@
+// Notes for Grader
+// Used the youtube videos and the help of copilot
+
 // ColoredPoint.js (c) 2012 matsuda
 // Vertex shader program
 var VSHADER_SOURCE =
@@ -20,8 +23,20 @@ let canvas;
 let gl;
 let a_Position;
 let u_FragColor;
-let u_ModelMatrix
+let u_ModelMatrix;
 let u_GlobalRotationMatrix;
+let g_globalAngle = 0.0;
+let g_jointSlider = 0.0;
+let g_purpleJoint = 0.0;
+let g_animation = true;
+let g_verticalAngle = 0.0;
+let g_isDragging = false;
+let g_lastX = -1;
+let g_lastY = -1;
+let g_rotationSpeed = 0.5;
+let g_scale = 1.0;
+let g_zoomSpeed = 0.1;
+
 function setupWebGL() {
   // Retrieve <canvas> element
   canvas = document.getElementById('webgl');
@@ -70,35 +85,72 @@ function connectVariablesToGLSL() {
     return;
   }
 }
-// const POINT = 0;
-// const TRIANGLE = 1;
-// const CIRCLE = 2;
-// let g_selectedColor = [1.0, 1.0, 1.0, 1.0]; 
-// let g_selectedType=POINT;
-// let g_segments = 10;
-let g_globalAngle = 0.0;
-let g_jointSlider = 0.0;
-let g_purpleJoint = 0.0;
-let g_animation = true;
+
 function htmlUI() {
   document.getElementById('on').onclick = function() { g_animation = true; };
   document.getElementById('off').onclick = function() { g_animation = false; };
 
-  // //sliders
-  document.getElementById('angleslide').addEventListener('mousemove', function() { g_globalAngle = this.value; renderShapes(); });
+  // Keep slider for fine-tuning or alternative control
   document.getElementById('jointslide').addEventListener('mousemove', function() { g_jointSlider = this.value; renderShapes(); });
   document.getElementById('purplejointslide').addEventListener('mousemove', function() { g_purpleJoint = this.value; renderShapes(); });
 }
+
+function mouseNavigation() {
+  // Add mouse events for canvas rotation
+  canvas.onmousedown = function(ev) { 
+    g_isDragging = true;
+    g_lastX = ev.clientX;
+    g_lastY = ev.clientY;
+  };
+  
+  canvas.onmouseup = function() { 
+    g_isDragging = false;
+  };
+  
+  canvas.onmouseleave = function() {
+    g_isDragging = false;
+  };
+  
+  canvas.onmousemove = function(ev) { 
+    if (g_isDragging) {
+      const dx = ev.clientX - g_lastX;
+      const dy = ev.clientY - g_lastY;
+      
+      // Update rotation angles
+      g_globalAngle -= dx * g_rotationSpeed;
+      g_verticalAngle -= dy * g_rotationSpeed;
+      
+      g_lastX = ev.clientX;
+      g_lastY = ev.clientY;
+      
+      // Redraw the scene
+      renderShapes();
+    }
+  };
+
+  canvas.onwheel = function(ev) {
+
+    ev.preventDefault(); 
+    
+    if (ev.deltaY > 0) {
+      g_scale =  Math.min(5.0, g_scale + g_zoomSpeed)
+    } else {
+      
+      g_scale = Math.max(0.1, g_scale - g_zoomSpeed)
+    }
+
+    renderShapes();
+  }
+}
+
 function main() {
 
   setupWebGL();
   connectVariablesToGLSL();
 
   htmlUI();
-  // Register function (event handler) to be called on a mouse press
-  canvas.onmousedown = function(ev){ click(ev) };
-  canvas.onmousemove = function(ev){ if (ev.buttons == 1) click(ev) }
 
+  mouseNavigation();
   // Specify the color for clearing <canvas>
   gl.clearColor(0.0, 0.0, 0.0, 1.0);
 
@@ -124,7 +176,6 @@ g_seconds = performance.now() / 1000.0 - g_startTime;
 
 function tick() {
   g_seconds = performance.now() / 1000.0 - g_startTime;
-  console.log(g_seconds);
 
   updateAnimationAngle();
 
@@ -140,10 +191,12 @@ function updateAnimationAngle() {
 }
 
 function renderShapes() { 
-  // Clear <canvas>
-  // var startTime = performance.now();
-
-  var globalRotMat = new Matrix4().rotate(g_globalAngle, 0, 1, 0);
+  let startTime = performance.now()
+  var globalRotMat = new Matrix4()
+    .scale(g_scale, g_scale, g_scale) 
+    .rotate(g_verticalAngle, 1, 0, 0) 
+    .rotate(g_globalAngle, 0, 1, 0); 
+  
   gl.uniformMatrix4fv(u_GlobalRotationMatrix, false, globalRotMat.elements);
 
   gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT); 
@@ -152,61 +205,168 @@ function renderShapes() {
   gl.cullFace(gl.BACK);
   gl.enable(gl.DEPTH_TEST);
 
-  // // Test triangle
-  // gl.uniform4f(u_FragColor, 0.9, 0.9, 0.4, 1.0); 
-  // const modelMatrix = new Matrix4(); 
-  // gl.uniformMatrix4fv(u_ModelMatrix, false, modelMatrix.elements);
-  // drawTriangle3D(gl, [-1.0,0.0,0.0,  -0.5,-1.0,0.0,  0.0,0.0,0.0]);
+  kelpStalk(-3,-0.2,4);
+  kelpStalk(-2,-0.2,-3);
+  kelpStalk(4,-0.2,0);
+  seaLemon();
 
-  // Draw Cube
-  var body = new Cube();
-  body.color = [1.0, 0.0, 0.0, 1.0];
-  body.matrix.translate(-.25,-.75,0.0);
-  body.matrix.rotate(-5,1,0,0);
-  body.matrix.scale(0.5,.3,0.5);
-  body.render()
+  var duration = performance.now() - startTime;
+  sendTextToHTML("perf", "fps " + 1000/duration);
+}
 
-  // Draw Cube
-  var arm = new Cube();
-  arm.color = [1.0, 1.0, 0.0, 1.0];
-  arm.matrix.translate(0,-.5,0.0);
-  arm.matrix.rotate(-5,1,0,0);
-  arm.matrix.rotate(g_jointSlider,0,0,1);
-  var yellowCoordinates = new Matrix4(arm.matrix);
-  arm.matrix.scale(0.25,.7,0.5);
-  arm.matrix.translate(-0.5,0,0);
-  arm.render()
+function kelpSection(x,y,z,stemToggle) {
 
-  var box = new Cube();
-  box.color = [1,0,1,1];
-  box.matrix = yellowCoordinates
-  box.matrix.translate(0,.65,0)
-  // box.matrix.rotate(g_purpleJoint,0,0,1)
-  box.matrix.rotate(g_purpleJoint,0,0,1)
-  box.matrix.scale(.3,.3,.3)
-  box.matrix.translate(-.5,0,-0.0001)
-  // box.matrix.translate(-.1,.1,0.0);
-  // box.matrix.rotate(-30,1,0,0);
-  // box.matrix.scale(0.2,.4,.2);
-  box.render()
+  var stem = new Cube();
+  stem.color = [0.0, 0.5, 0.0, 1.0];
+  stem.matrix.translate(-0.075, -.25  , -0.075);
+  stem.matrix.scale(0.15, 0.5, 0.15);
+  stem.matrix.translate(x,y,z)
+  stem.matrix.scale(0.5, 0.5, 0.5);
+  stemMatrix = new Matrix4(stem.matrix);
+  stem.render();
 
-  var k = 10;
-  for (var i = 1; i < k; i++) {
-    var c = new Cube();
-    c.matrix.translate(-.8,1.9*i/k-1,0.0);
-    c.matrix.rotate(g_seconds*1000,1,1,1);
-    c.matrix.scale(.1,.5/k,.1/k)
-    c.color = [
-      (Math.sin(g_seconds * i) * 0.5 + 0.5), 
-      (Math.cos(g_seconds * i * 1.5) * 0.5 + 0.5), 
-      (Math.sin(g_seconds * i * 2) * 0.5 + 0.5), 
-      1
-    ];
-    c.render()
+  
+  // // Generate a seed based on g_startTime (only set once at the beginning)
+  // const leafSeed = Math.floor(g_startTime * 1000);
+  
+  // // Simple deterministic random function based on the seed
+  // function seededRandom(seed, index) {
+  //   const x = Math.sin(seed + index * 9999) * 10000;
+  //   return x - Math.floor(x);
+  // }
+  // Create 3 leaves coming out from the right side of the stem
+  const leafSpacing = 0.15; // Vertical spacing between leaves
+  const leafStartY = -0.15 ; // Starting position from bottom of stem
+  if (stemToggle) {
+    // First leaf (bottom)
+    var leaf1 = new Leaf();
+    leaf1.color = [0.0, 0.7, 0.0, 1.0];
+    leaf1.matrix = new Matrix4(stemMatrix);
+    leaf1.matrix.translate(2, (leafStartY + 0.25) / 0.5, 0.5 ); 
+    leaf1.matrix.rotate(90, 0, 0, 1); 
+    // Add swaying motion
+    leaf1.matrix.rotate(10 * Math.sin(g_seconds * 1.5), 0, 1, 0);
+    leaf1.matrix.rotate(5 * Math.cos(g_seconds), 1, 0, 1); 
+    leaf1.matrix.scale(0.2/0.5, 0.2/0.15, 0.1/0.15); 
+    leaf1.render();
+    
+    // Second leaf (middle)
+    var leaf2 = new Leaf();
+    leaf2.color = [0.0, 0.7, 0.0, 1.0];
+    leaf2.matrix = new Matrix4(stemMatrix);
+    leaf2.matrix.translate(2, (leafSpacing + leafStartY + 0.25) / 0.5, 0.5 ); 
+    leaf2.matrix.rotate(90, 0, 0, 1);
+    // Add swaying motion with different timing
+    leaf2.matrix.rotate(12 * Math.sin(g_seconds * 1.2 + 0.5), 0, 1, 0);
+    leaf2.matrix.rotate(8 * Math.cos(g_seconds * 0.8), 1, 0, 1);
+    leaf2.matrix.scale(0.2/0.5, 0.2/0.15, 0.1/0.15); 
+    leaf2.render();
+    
+    // Third leaf (top)
+    var leaf3 = new Leaf();
+    leaf3.color = [0.0, 0.7, 0.0, 1.0];
+    leaf3.matrix = new Matrix4(stemMatrix);
+    leaf3.matrix.translate(2, (leafSpacing*2 + leafStartY + 0.25) / 0.5, 0.5 ); 
+    leaf3.matrix.rotate(90, 0, 0, 1);
+    // Add swaying motion with different amplitude and phase
+    leaf3.matrix.rotate(15 * Math.sin(g_seconds * 0.9 + 1.0), 0, 1, 0);
+    leaf3.matrix.rotate(6 * Math.cos(g_seconds * 1.1), 1, 0, 1);
+    leaf3.matrix.scale(0.2/0.5, 0.2/0.15, 0.1/0.15); 
+    leaf3.render();
   }
+}
 
-  // var duration = performance.now() - startTime;
-  // sendTextToHTML("perf", "numdot " + len + " ms " + duration + " fps " + 1000/duration);
+function kelpStalk(x,y,z) {
+  var numSections = 12; 
+  var sectionHeight = 0.5;  
+  var waveSpeed = 2.0;  
+  var waveAmplitude = 0.5 ; 
+    
+  for (let i = 1; i < numSections; i++) {
+    var shifty = i * sectionHeight;
+    
+    
+    var heightFactor = i / numSections;
+    var shiftx = Math.sin(g_seconds * waveSpeed + i * 0.2) * waveAmplitude * heightFactor;
+    
+    kelpSection(shiftx + x, shifty + y, z, i > 1);
+  }
+}
+
+function seaLemon() {
+  // Base layer - wide cube
+  var baseCube = new Cube();
+  baseCube.color = [0.9, 0.8, 0.2, 1.0]; 
+  baseCube.matrix.translate(-0.2, -0.1, -0.4);
+  baseCube.matrix.scale(0.8, 0.1, 1.6);
+  baseCube.matrix.scale(0.5,0.5,0.5)
+  baseCube.render();
+  
+  baseMatrix = new Matrix4(baseCube.matrix);
+
+  // Middle layer - less wide
+  var middleCube = new Cube();
+  middleCube.color = [0.9, 0.75, 0.15, 1.0]; 
+  middleCube.matrix = new Matrix4(baseMatrix);
+  middleCube.matrix.translate(0.06, 0.5, 0.03); 
+  middleCube.matrix.scale(0.7/0.8, 0.12/0.1, 1.4/1.6);  
+  middleCube.render();
+  
+  // Top layer - dome shape
+  var topCube = new Cube();
+  topCube.color = [0.85, 0.7, 0.1, 1.0]; 
+  topCube.matrix = new Matrix4(baseMatrix);
+  topCube.matrix.translate(0.19, 0.72, 0.1);  
+  topCube.matrix.scale(0.5/0.8, 0.15/0.1, 1.1/1.6); 
+  topCube.render();
+
+  // Left eye
+  var leftEye = new Leaf();
+  leftEye.color = [0.9, 0.8, 0.2, 1.0];
+  leftEye.matrix = new Matrix4(baseMatrix);
+  leftEye.matrix.translate(0.25, 2.5, 0.1);
+  leftEye.matrix.scale(0.07, 0.45, 0.03); 
+  leftEye.matrix.rotate(45, 0, 0, 1); 
+  leftEye.matrix.scale(2,2,2);
+  
+  leftEye.render();
+  
+  // Right eye
+  var rightEye = new Leaf();
+  rightEye.color = [0.9, 0.8, 0.2, 1.0];
+  rightEye.matrix = new Matrix4(baseMatrix);
+  rightEye.matrix.translate(0.75, 2.5, 0.1); 
+  rightEye.matrix.scale(0.07, 0.45, 0.03); 
+  rightEye.matrix.rotate(-45, 0, 0, 1); 
+  rightEye.matrix.scale(2,2,2);
+  
+  rightEye.render();
+
+  // gills
+  const baseGillColor = [1.0, 1.0, 0.4, 0.7];  
+
+  function createGills(numGills, gillRadius, baseGillColor) {
+    for (let i = 0; i < numGills; i++) {
+      const angle = (i / numGills) * Math.PI * 2; 
+      
+      const x = Math.cos(angle) * gillRadius;
+      const z = Math.sin(angle) * (gillRadius/2);
+      
+      var gill = new Leaf();
+      gill.color = baseGillColor;  
+      
+      gill.matrix = new Matrix4(baseMatrix);
+      
+      gill.matrix.translate(0.5 + x, 2.5  , 0.7 + z);
+      
+      gill.matrix.scale(0.1, 0.7, 0.05);
+      
+      gill.render();
+    }
+  }
+  createGills(12, 0.2, baseGillColor);
+  createGills(6, 0.1, baseGillColor);
+  
 }
 
 function sendTextToHTML(id, text) {

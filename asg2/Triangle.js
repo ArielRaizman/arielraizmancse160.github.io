@@ -153,5 +153,5 @@ function drawTriangle3D(gl,vertices) {
 
   // return n;
   gl.drawArrays(gl.TRIANGLES, 0, n);
-  console.log("drawTriangle3D")
+  // console.log("drawTriangle3D")
 }
