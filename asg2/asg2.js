@@ -90,9 +90,6 @@ function htmlUI() {
   document.getElementById('on').onclick = function() { g_animation = true; };
   document.getElementById('off').onclick = function() { g_animation = false; };
 
-  // Keep slider for fine-tuning or alternative control
-  document.getElementById('jointslide').addEventListener('mousemove', function() { g_jointSlider = this.value; renderShapes(); });
-  document.getElementById('purplejointslide').addEventListener('mousemove', function() { g_purpleJoint = this.value; renderShapes(); });
 }
 
 function mouseNavigation() {
@@ -151,6 +148,8 @@ function main() {
   htmlUI();
 
   mouseNavigation();
+  setupSeaLemonClick(); // Add this to register the click handler
+  
   // Specify the color for clearing <canvas>
   gl.clearColor(0.0, 0.0, 0.0, 1.0);
 
@@ -293,13 +292,67 @@ function kelpStalk(x,y,z) {
   }
 }
 
+let g_seaLemonScrunched = false;
+let g_seaLemonScrunchTime = 0;
+let g_scrunchDuration = {
+  scrunchUp: 0.2,
+  scrunchDown: 0.5,
+  hold: 1.0
+}; 
+let g_scrunchState = "none";
+
+function scrunchSeaLemon() {
+  g_seaLemonScrunched = true;
+  g_seaLemonScrunchTime = g_seconds;
+  g_scrunchState = "scrunchUp";
+}
+
+function setupSeaLemonClick() {
+  canvas.addEventListener('click', function(ev) {
+    if (ev.shiftKey) {
+      const [x, y] = coordsToGL(ev);
+      if (Math.abs(x) < 0.5 && Math.abs(y) < 0.5) {
+        scrunchSeaLemon();
+      }
+    }
+  });
+}
+
 function seaLemon() {
+  let totalCycleTime = g_scrunchDuration.scrunchUp + g_scrunchDuration.hold + g_scrunchDuration.scrunchDown;
+  
+  let scrunchFactor = 0;
+  if (g_seaLemonScrunched) {
+    let timeSinceScrunch = g_seconds - g_seaLemonScrunchTime;
+    
+    if (timeSinceScrunch > totalCycleTime) {
+      g_seaLemonScrunched = false;
+      g_scrunchState = 'none';
+    } else {
+      if (timeSinceScrunch < g_scrunchDuration.scrunchUp) {
+        scrunchFactor = timeSinceScrunch / g_scrunchDuration.scrunchUp;
+      } else if (timeSinceScrunch < g_scrunchDuration.scrunchUp + g_scrunchDuration.hold) {
+        scrunchFactor = 1.0;
+      } else {
+        const scrunchDownTime = timeSinceScrunch - (g_scrunchDuration.scrunchUp + g_scrunchDuration.hold);
+        scrunchFactor = 1.0 - (scrunchDownTime / g_scrunchDuration.scrunchDown);
+      }
+    }
+  }
+  
+  // scrunch ammount
+  let heightScale = 1.0 - 0.7 * -scrunchFactor; 
+  let widthScale = 1.0 + 0.6 * -scrunchFactor; 
+
+  let offsetX = -0.2 * scrunchFactor;
+  let offsetZ = -0.3 * scrunchFactor;
+  
   // Base layer - wide cube
   var baseCube = new Cube();
   baseCube.color = [0.9, 0.8, 0.2, 1.0]; 
-  baseCube.matrix.translate(-0.2, -0.1, -0.4);
-  baseCube.matrix.scale(0.8, 0.1, 1.6);
-  baseCube.matrix.scale(0.5,0.5,0.5)
+  baseCube.matrix.translate(-0.2 - offsetX/2, -0.1, -0.4 - offsetZ);
+  baseCube.matrix.scale(0.8 * widthScale, 0.1 * heightScale, 1.6 * widthScale);
+  baseCube.matrix.scale(0.5, 0.5, 0.5);
   baseCube.render();
   
   baseMatrix = new Matrix4(baseCube.matrix);
