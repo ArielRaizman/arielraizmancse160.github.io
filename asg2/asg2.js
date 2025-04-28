@@ -36,6 +36,8 @@ let g_lastY = -1;
 let g_rotationSpeed = 0.5;
 let g_scale = 1.0;
 let g_zoomSpeed = 0.1;
+let g_eyeRotation = -45;
+let g_userScrunch = 0.0; 
 
 function setupWebGL() {
   // Retrieve <canvas> element
@@ -89,6 +91,9 @@ function connectVariablesToGLSL() {
 function htmlUI() {
   document.getElementById('on').onclick = function() { g_animation = true; };
   document.getElementById('off').onclick = function() { g_animation = false; };
+
+  document.getElementById('eyerotation').addEventListener('mousemove', function() { g_eyeRotation = this.value; });
+  document.getElementById('scrunchslide').addEventListener('mousemove', function() { g_userScrunch = this.value; });
 
 }
 
@@ -173,13 +178,27 @@ function coordsToGL(ev) {
 g_startTime = performance.now() / 1000.0;
 g_seconds = performance.now() / 1000.0 - g_startTime;
 
+let g_wasAnimating = true; 
+
 function tick() {
-  g_seconds = performance.now() / 1000.0 - g_startTime;
+  let startTime = performance.now()
+  if (g_animation) {
+    if (!g_wasAnimating) {
+      g_startTime = performance.now() / 1000.0 - g_seconds;
+      g_wasAnimating = true;
+    }
+    g_seconds = performance.now() / 1000.0 - g_startTime;
+  } else {
+    g_wasAnimating = false;
+  }
 
   updateAnimationAngle();
 
   renderShapes();
+  var duration = performance.now() - startTime;
+  sendTextToHTML("perf", "fps " + 100/duration);
   requestAnimationFrame(tick);
+  
 }
 
 function updateAnimationAngle() {
@@ -190,7 +209,7 @@ function updateAnimationAngle() {
 }
 
 function renderShapes() { 
-  let startTime = performance.now()
+  // let startTime = performance.now()
   var globalRotMat = new Matrix4()
     .scale(g_scale, g_scale, g_scale) 
     .rotate(g_verticalAngle, 1, 0, 0) 
@@ -209,14 +228,15 @@ function renderShapes() {
   kelpStalk(4,-0.2,0);
   seaLemon();
 
-  var duration = performance.now() - startTime;
-  sendTextToHTML("perf", "fps " + 1000/duration);
+  // var duration = performance.now() - startTime;
+  // sendTextToHTML("perf", "fps " + 1000/duration);
 }
 
 function kelpSection(x,y,z,stemToggle) {
 
+  // Main stem
   var stem = new Cube();
-  stem.color = [0.0, 0.5, 0.0, 1.0];
+  stem.color = [0.2, 0.5, 0.0, 1.0];
   stem.matrix.translate(-0.075, -.25  , -0.075);
   stem.matrix.scale(0.15, 0.5, 0.15);
   stem.matrix.translate(x,y,z)
@@ -224,59 +244,50 @@ function kelpSection(x,y,z,stemToggle) {
   stemMatrix = new Matrix4(stem.matrix);
   stem.render();
 
+  // 3 branches with leaves
+  const leafSpacing = 0.15; 
+  const leafStartY = -0.15; 
   
-  // // Generate a seed based on g_startTime (only set once at the beginning)
-  // const leafSeed = Math.floor(g_startTime * 1000);
-  
-  // // Simple deterministic random function based on the seed
-  // function seededRandom(seed, index) {
-  //   const x = Math.sin(seed + index * 9999) * 10000;
-  //   return x - Math.floor(x);
-  // }
-  // Create 3 leaves coming out from the right side of the stem
-  const leafSpacing = 0.15; // Vertical spacing between leaves
-  const leafStartY = -0.15 ; // Starting position from bottom of stem
   if (stemToggle) {
-    // First leaf (bottom)
-    var leaf1 = new Leaf();
-    leaf1.color = [0.0, 0.7, 0.0, 1.0];
-    leaf1.matrix = new Matrix4(stemMatrix);
-    leaf1.matrix.translate(2, (leafStartY + 0.25) / 0.5, 0.5 ); 
-    leaf1.matrix.rotate(90, 0, 0, 1); 
-    // Add swaying motion
-    leaf1.matrix.rotate(10 * Math.sin(g_seconds * 1.5), 0, 1, 0);
-    leaf1.matrix.rotate(5 * Math.cos(g_seconds), 1, 0, 1); 
-    leaf1.matrix.scale(0.2/0.5, 0.2/0.15, 0.1/0.15); 
-    leaf1.render();
-    
-    // Second leaf (middle)
-    var leaf2 = new Leaf();
-    leaf2.color = [0.0, 0.7, 0.0, 1.0];
-    leaf2.matrix = new Matrix4(stemMatrix);
-    leaf2.matrix.translate(2, (leafSpacing + leafStartY + 0.25) / 0.5, 0.5 ); 
-    leaf2.matrix.rotate(90, 0, 0, 1);
-    // Add swaying motion with different timing
-    leaf2.matrix.rotate(12 * Math.sin(g_seconds * 1.2 + 0.5), 0, 1, 0);
-    leaf2.matrix.rotate(8 * Math.cos(g_seconds * 0.8), 1, 0, 1);
-    leaf2.matrix.scale(0.2/0.5, 0.2/0.15, 0.1/0.15); 
-    leaf2.render();
-    
-    // Third leaf (top)
-    var leaf3 = new Leaf();
-    leaf3.color = [0.0, 0.7, 0.0, 1.0];
-    leaf3.matrix = new Matrix4(stemMatrix);
-    leaf3.matrix.translate(2, (leafSpacing*2 + leafStartY + 0.25) / 0.5, 0.5 ); 
-    leaf3.matrix.rotate(90, 0, 0, 1);
-    // Add swaying motion with different amplitude and phase
-    leaf3.matrix.rotate(15 * Math.sin(g_seconds * 0.9 + 1.0), 0, 1, 0);
-    leaf3.matrix.rotate(6 * Math.cos(g_seconds * 1.1), 1, 0, 1);
-    leaf3.matrix.scale(0.2/0.5, 0.2/0.15, 0.1/0.15); 
-    leaf3.render();
+    for (let i = 0; i < 3; i++) {
+      const yPos = (leafStartY + i * leafSpacing + 0.25) / 0.5;
+      
+      //  branch
+      var branch = new Cube();
+      branch.color = [0.2, 0.6, 0.0, 1.0];
+      branch.matrix = new Matrix4(stemMatrix);
+      branch.matrix.translate(1.5, yPos, 0.5);
+
+      const branchAngle = 15 * Math.sin(g_seconds * 1.3 + i * 0.5);
+      branch.matrix.rotate(branchAngle, 0, 1, 0);
+      branch.matrix.rotate(90, 0, 0, 1);
+
+      branch.matrix.scale(0.1, 0.8, 0.4);
+      branch.matrix.translate(0, -0.2, -0.5); // Adjust position to end of stem
+      var branchMatrix = new Matrix4(branch.matrix);
+      branch.render();
+      
+      // Leaf
+      var leaf = new Leaf();
+      leaf.color = [0.0, 0.7, 0.0, 1.0];
+      leaf.matrix = new Matrix4(branchMatrix);
+      leaf.matrix.translate(0, -2, 0); 
+      // leaf.matrix.scale(0.3  , 0.8, 0.3); 
+      
+      leaf.matrix.translate(0.5,1.5, 0.5);
+
+      const leafAngle = 10 * Math.sin(g_seconds * 1.8 + i * 0.7);
+      leaf.matrix.rotate(leafAngle, 0, 0, 1);
+      leaf.matrix.rotate(8 * Math.cos(g_seconds * 1.2 + i * 0.3), 1, 0, 0);
+      leaf.matrix.scale(2.0, 1.5, 1.0);
+      
+      leaf.render();
+    }
   }
 }
 
 function kelpStalk(x,y,z) {
-  var numSections = 12; 
+  var numSections = 6; 
   var sectionHeight = 0.5;  
   var waveSpeed = 2.0;  
   var waveAmplitude = 0.5 ; 
@@ -321,7 +332,8 @@ function setupSeaLemonClick() {
 function seaLemon() {
   let totalCycleTime = g_scrunchDuration.scrunchUp + g_scrunchDuration.hold + g_scrunchDuration.scrunchDown;
   
-  let scrunchFactor = 0;
+  // shift click scrunching
+  let animationScrunchFactor = 0;
   if (g_seaLemonScrunched) {
     let timeSinceScrunch = g_seconds - g_seaLemonScrunchTime;
     
@@ -330,47 +342,59 @@ function seaLemon() {
       g_scrunchState = 'none';
     } else {
       if (timeSinceScrunch < g_scrunchDuration.scrunchUp) {
-        scrunchFactor = timeSinceScrunch / g_scrunchDuration.scrunchUp;
+        animationScrunchFactor = timeSinceScrunch / g_scrunchDuration.scrunchUp;
       } else if (timeSinceScrunch < g_scrunchDuration.scrunchUp + g_scrunchDuration.hold) {
-        scrunchFactor = 1.0;
+        animationScrunchFactor = 1.0;
       } else {
         const scrunchDownTime = timeSinceScrunch - (g_scrunchDuration.scrunchUp + g_scrunchDuration.hold);
-        scrunchFactor = 1.0 - (scrunchDownTime / g_scrunchDuration.scrunchDown);
+        animationScrunchFactor = 1.0 - (scrunchDownTime / g_scrunchDuration.scrunchDown);
       }
     }
   }
   
-  // scrunch ammount
-  let heightScale = 1.0 - 0.7 * -scrunchFactor; 
+  // relative to slider scrunch
+  let scrunchFactor = g_userScrunch/100 + animationScrunchFactor;
+  
+  const idleAnimationSpeed = 2; 
+  const idleAnimationAmount = 0.05; 
+  const idleFactor = Math.sin(g_seconds * idleAnimationSpeed) * idleAnimationAmount;
+  
+  const heightIdleFactor = Math.sin(g_seconds * idleAnimationSpeed + 0.5) * 2* idleAnimationAmount;
+  const breatheScaleY = 1.0 + heightIdleFactor;
+  
+  const breatheScaleZ = 1.0 + idleFactor;
+  
+  let heightScale = (1.0 - 0.7 * -scrunchFactor) * breatheScaleY; 
   let widthScale = 1.0 + 0.6 * -scrunchFactor; 
-
+  
   let offsetX = -0.2 * scrunchFactor;
   let offsetZ = -0.3 * scrunchFactor;
   
-  // Base layer - wide cube
+  // base layer
   var baseCube = new Cube();
   baseCube.color = [0.9, 0.8, 0.2, 1.0]; 
   baseCube.matrix.translate(-0.2 - offsetX/2, -0.1, -0.4 - offsetZ);
-  baseCube.matrix.scale(0.8 * widthScale, 0.1 * heightScale, 1.6 * widthScale);
+  baseCube.matrix.translate(0, 0, 0.8 * (1 - breatheScaleZ) * widthScale/2);
+  baseCube.matrix.scale(0.8 * widthScale, 0.1 * heightScale, 1.6 * widthScale * breatheScaleZ);
   baseCube.matrix.scale(0.5, 0.5, 0.5);
   baseCube.render();
   
   baseMatrix = new Matrix4(baseCube.matrix);
 
-  // Middle layer - less wide
+  // mid layer
   var middleCube = new Cube();
   middleCube.color = [0.9, 0.75, 0.15, 1.0]; 
   middleCube.matrix = new Matrix4(baseMatrix);
   middleCube.matrix.translate(0.06, 0.5, 0.03); 
-  middleCube.matrix.scale(0.7/0.8, 0.12/0.1, 1.4/1.6);  
+  middleCube.matrix.scale(0.7/0.8, (0.12/0.1) * breatheScaleY, 1.4/1.6);  
   middleCube.render();
   
-  // Top layer - dome shape
+  // top layer
   var topCube = new Cube();
   topCube.color = [0.85, 0.7, 0.1, 1.0]; 
   topCube.matrix = new Matrix4(baseMatrix);
   topCube.matrix.translate(0.19, 0.72, 0.1);  
-  topCube.matrix.scale(0.5/0.8, 0.15/0.1, 1.1/1.6); 
+  topCube.matrix.scale(0.5/0.8, (0.15/0.1) * breatheScaleY, 1.1/1.6); 
   topCube.render();
 
   // Left eye
@@ -379,7 +403,7 @@ function seaLemon() {
   leftEye.matrix = new Matrix4(baseMatrix);
   leftEye.matrix.translate(0.25, 2.5, 0.1);
   leftEye.matrix.scale(0.07, 0.45, 0.03); 
-  leftEye.matrix.rotate(45, 0, 0, 1); 
+  leftEye.matrix.rotate(-g_eyeRotation, 0, 0, 1); 
   leftEye.matrix.scale(2,2,2);
   
   leftEye.render();
@@ -390,7 +414,7 @@ function seaLemon() {
   rightEye.matrix = new Matrix4(baseMatrix);
   rightEye.matrix.translate(0.75, 2.5, 0.1); 
   rightEye.matrix.scale(0.07, 0.45, 0.03); 
-  rightEye.matrix.rotate(-45, 0, 0, 1); 
+  rightEye.matrix.rotate(g_eyeRotation, 0, 0, 1); 
   rightEye.matrix.scale(2,2,2);
   
   rightEye.render();
@@ -402,6 +426,10 @@ function seaLemon() {
     for (let i = 0; i < numGills; i++) {
       const angle = (i / numGills) * Math.PI * 2; 
       
+      // animation offset
+      const phaseOffset = i * 0.2;
+      const breatheFactor = 1.0 + idleAnimationAmount * Math.sin(2 * g_seconds * idleAnimationSpeed + phaseOffset);
+      
       const x = Math.cos(angle) * gillRadius;
       const z = Math.sin(angle) * (gillRadius/2);
       
@@ -410,16 +438,15 @@ function seaLemon() {
       
       gill.matrix = new Matrix4(baseMatrix);
       
-      gill.matrix.translate(0.5 + x, 2.5  , 0.7 + z);
+      gill.matrix.translate(0.5 + x, 2.5, 0.7 + z);
       
-      gill.matrix.scale(0.1, 0.7, 0.05);
+      gill.matrix.scale(0.1 * breatheFactor, 0.7 * breatheFactor, 0.05 * breatheFactor);
       
       gill.render();
     }
   }
   createGills(12, 0.2, baseGillColor);
   createGills(6, 0.1, baseGillColor);
-  
 }
 
 function sendTextToHTML(id, text) {
