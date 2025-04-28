@@ -94,6 +94,7 @@ function htmlUI() {
 
   document.getElementById('eyerotation').addEventListener('mousemove', function() { g_eyeRotation = this.value; });
   document.getElementById('scrunchslide').addEventListener('mousemove', function() { g_userScrunch = this.value; });
+  document.getElementById('viewangle').addEventListener('mousemove', function() { g_globalAngle = this.value; });
 
 }
 
@@ -263,7 +264,7 @@ function kelpSection(x,y,z,stemToggle) {
       branch.matrix.rotate(90, 0, 0, 1);
 
       branch.matrix.scale(0.1, 0.8, 0.4);
-      branch.matrix.translate(0, -0.2, -0.5); // Adjust position to end of stem
+      branch.matrix.translate(0, -0.2, -0.5); 
       var branchMatrix = new Matrix4(branch.matrix);
       branch.render();
       
