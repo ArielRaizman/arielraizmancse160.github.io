@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Change a point color</title>
+  </head>
+
+  <body onload="main()">
+    <span style="width: 20%;">
+    <canvas id="webgl" width="800" height="800">
+    Please use a browser that supports "canvas"
+    </canvas>
+
+    <br />
+    <p id="perf">XXX</p>
+    <button id="on">ON</button>
+    <button id="off">OFF</button>
+    scrunchiness<input type="range" min="-65" max= "65" value="0" class="slider" id="scrunchslide" />
+    eye angle<input type="range" min="-50" max= "50" value="-45" class="slider" id="eyerotation" />
+    view angle<input type="range" min="-50" max= "50" value="0" class="slider" id="viewangle" />
+    <br />
+    <br />
+    <br />
+    additional info: <br />
+    the sea lemon scene is rotated and scaled with the mouse and scroll wheel<br />
+    control the scrunchiness and eye angle with the sliders :)<br />
+    on off buttons toggle the animation<br />
+    shift click to poke the sea lemon<br />
+    the kelp has 3 levelled joints that move independently to simulate the current<br />
+  </span>
+      <script srsc="../lib/webgl-utils.js"></script>
+      <script src="../lib/webgl-debug.js"></script>
+      <script src="../lib/cuon-utils.js"></script>
+    <script src="../lib/cuon-matrix-cse160.js"></script>
+    <script src="asg3.js"></script>
+    <script src="Cube.js"></script>
+    <script src="Leaf.js"></script>
+    <script src="Triangle.js"></script>
+  </body>
+</html>
