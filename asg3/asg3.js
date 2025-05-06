@@ -59,19 +59,6 @@ let a_uv;
 let u_Sampler0;
 let u_whichTexture = -1; 
 
-let g_cameraPos = [0.0, 1.0, 5.0]; // x, y, z
-let g_cameraFront = [0.0, 0.0, -1.0]; // Direction vector
-let g_cameraUp = [0.0, 1.0, 0.0]; // Up vector
-let g_cameraSpeed = 0.1; // Movement speed
-let g_yaw = -90.0; // Horizontal rotation (in degrees)
-let g_pitch = 0.0; // Vertical rotation (in degrees)
-let g_mouseSensitivity = 0.1;
-let g_firstMouse = true; // Flag for initial mouse position
-
-const glMatrix = {
-  toRadian: function(a) { return a * Math.PI / 180.0; }
-};
-
 function setupWebGL() {
   // Retrieve <canvas> element
   canvas = document.getElementById('webgl');
@@ -189,113 +176,51 @@ function sendTextureToTEXTURE0(image) {
 }
 
 function mouseNavigation() {
-  canvas.addEventListener('mousedown', function() {
-    document.body.requestPointerLock = document.body.requestPointerLock || 
-                                      document.body.mozRequestPointerLock || 
-                                      document.body.webkitRequestPointerLock;
-    document.body.requestPointerLock();
+  // Add mouse events for canvas rotation
+  canvas.onmousedown = function(ev) { 
     g_isDragging = true;
-  });
+    g_lastX = ev.clientX;
+    g_lastY = ev.clientY;
+  };
   
-  document.addEventListener('pointerlockchange', lockChangeAlert, false);
-  document.addEventListener('mozpointerlockchange', lockChangeAlert, false);
-  document.addEventListener('webkitpointerlockchange', lockChangeAlert, false);
+  canvas.onmouseup = function() { 
+    g_isDragging = false;
+  };
   
-  function lockChangeAlert() {
-    if (document.pointerLockElement === canvas || 
-        document.mozPointerLockElement === canvas || 
-        document.webkitPointerLockElement === canvas) {
-      // Pointer is locked
-      document.addEventListener('mousemove', updateCamera, false);
-    } else {
-      // Pointer is unlocked
-      document.removeEventListener('mousemove', updateCamera, false);
-      g_isDragging = false;
+  canvas.onmouseleave = function() {
+    g_isDragging = false;
+  };
+  
+  canvas.onmousemove = function(ev) { 
+    if (g_isDragging) {
+      const dx = ev.clientX - g_lastX;
+      const dy = ev.clientY - g_lastY;
+      
+      // Update rotation angles
+      g_globalAngle -= dx * g_rotationSpeed;
+      g_verticalAngle -= dy * g_rotationSpeed;
+      
+      g_lastX = ev.clientX;
+      g_lastY = ev.clientY;
+      
+      // Redraw the scene
+      renderShapes();
     }
-  }
-  
-  function updateCamera(e) {
-    if (!g_isDragging) return;
-    
-    // Get mouse movement
-    const movementX = e.movementX || e.mozMovementX || e.webkitMovementX || 0;
-    const movementY = e.movementY || e.mozMovementY || e.webkitMovementY || 0;
-    
-    // Update camera angles
-    g_yaw += movementX * g_mouseSensitivity;
-    g_pitch -= movementY * g_mouseSensitivity;
-    
-    // Limit pitch to avoid camera flipping
-    g_pitch = Math.max(Math.min(g_pitch, 89), -89);
-    
-    // Calculate new camera front vector
-    const frontX = Math.cos(glMatrix.toRadian(g_yaw)) * Math.cos(glMatrix.toRadian(g_pitch));
-    const frontY = Math.sin(glMatrix.toRadian(g_pitch));
-    const frontZ = Math.sin(glMatrix.toRadian(g_yaw)) * Math.cos(glMatrix.toRadian(g_pitch));
-    
-    g_cameraFront = normalize3D([frontX, frontY, frontZ]);
-    
-    renderShapes();
-  }
+  };
 
-  // Keep zoom functionality
   canvas.onwheel = function(ev) {
+
     ev.preventDefault(); 
     
     if (ev.deltaY > 0) {
-      g_cameraSpeed = Math.max(0.05, g_cameraSpeed - 0.01);
+      g_scale =  Math.min(5.0, g_scale + g_zoomSpeed)
     } else {
-      g_cameraSpeed = Math.min(0.5, g_cameraSpeed + 0.01);
+      
+      g_scale = Math.max(0.1, g_scale - g_zoomSpeed)
     }
-  };
-}
 
-function setupKeyboardControls() {
-  document.addEventListener('keydown', function(event) {
-    const key = event.key.toLowerCase();
-    
-    // Calculate speed based on frame time
-    const speed = g_cameraSpeed;
-    
-    // Handle WASD keys
-    if (key === 'w') { // Forward
-      // Move in the direction the camera is facing
-      g_cameraPos[0] += g_cameraFront[0] * speed;
-      g_cameraPos[1] += g_cameraFront[1] * speed;
-      g_cameraPos[2] += g_cameraFront[2] * speed;
-    }
-    if (key === 's') { // Backward
-      g_cameraPos[0] -= g_cameraFront[0] * speed;
-      g_cameraPos[1] -= g_cameraFront[1] * speed;
-      g_cameraPos[2] -= g_cameraFront[2] * speed;
-    }
-    if (key === 'a') { // Left
-      // Move left (cross product of up and front to get right, then negate)
-      const right = normalize3D(cross3D(g_cameraFront, g_cameraUp));
-      g_cameraPos[0] -= right[0] * speed;
-      g_cameraPos[2] -= right[2] * speed;
-    }
-    if (key === 'd') { // Right
-      const right = normalize3D(cross3D(g_cameraFront, g_cameraUp));
-      g_cameraPos[0] += right[0] * speed;
-      g_cameraPos[2] += right[2] * speed;
-    }
-    
-    renderShapes(); // Update the scene
-  });
-}
-
-function normalize3D(v) {
-  let length = Math.sqrt(v[0] * v[0] + v[1] * v[1] + v[2] * v[2]);
-  return [v[0] / length, v[1] / length, v[2] / length];
-}
-
-function cross3D(a, b) {
-  return [
-    a[1] * b[2] - a[2] * b[1],
-    a[2] * b[0] - a[0] * b[2],
-    a[0] * b[1] - a[1] * b[0]
-  ];
+    renderShapes();
+  }
 }
 
 function main() {
@@ -306,7 +231,6 @@ function main() {
   htmlUI();
 
   mouseNavigation();
-  setupKeyboardControls();
   setupSeaLemonClick(); // Add this to register the click handler
   initTextures(); // Initialize textures
   
@@ -367,23 +291,25 @@ function updateAnimationAngle() {
 }
 
 function renderShapes() { 
-  // Create view matrix for first-person camera
-  var viewMatrix = new Matrix4();
-  viewMatrix.setLookAt(
-    g_cameraPos[0], g_cameraPos[1], g_cameraPos[2],  // Camera position
-    g_cameraPos[0] + g_cameraFront[0], g_cameraPos[1] + g_cameraFront[1], g_cameraPos[2] + g_cameraFront[2],  // Look at point
-    g_cameraUp[0], g_cameraUp[1], g_cameraUp[2]  // Up vector
-  );
+  // let startTime = performance.now()
+  var globalRotMat = new Matrix4()
+    .scale(g_scale, g_scale, g_scale) 
+    .rotate(g_verticalAngle, 1, 0, 0) 
+    .rotate(g_globalAngle, 0, 1, 0); 
   
-  // Replace the global rotation matrix with our view matrix
-  gl.uniformMatrix4fv(u_GlobalRotationMatrix, false, viewMatrix.elements);
+  gl.uniformMatrix4fv(u_GlobalRotationMatrix, false, globalRotMat.elements);
 
   gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT); 
+
+  
 
   kelpStalk(-3,-0.2,4);
   kelpStalk(-2,-0.2,-3);
   kelpStalk(4,-0.2,0);
   seaLemon();
+
+  // var duration = performance.now() - startTime;
+  // sendTextToHTML("perf", "fps " + 1000/duration);
 }
 
 function kelpSection(x,y,z,stemToggle) {
