@@ -9,8 +9,10 @@ var VSHADER_SOURCE =
   varying vec2 v_UV;
   uniform mat4  u_ModelMatrix;
   uniform mat4 u_GlobalRotationMatrix;
+  uniform mat4 u_ViewMatrix;
+  uniform mat4 u_ProjectionMatrix;
   void main() {
-    gl_Position = u_GlobalRotationMatrix * u_ModelMatrix * a_Position;
+    gl_Position = u_ProjectionMatrix* u_ViewMatrix* u_GlobalRotationMatrix * u_ModelMatrix * a_Position;
     v_UV = a_UV;
   }`
 
@@ -20,6 +22,7 @@ var FSHADER_SOURCE =
   varying vec2 v_UV;
   uniform vec4 u_FragColor;
   uniform sampler2D u_Sampler0;
+  uniform sampler2D u_Sampler1;
   uniform int u_whichTexture;
   void main() {
     // gl_FragColor = u_FragColor;
@@ -31,7 +34,10 @@ var FSHADER_SOURCE =
       gl_FragColor = vec4(v_UV,1,1);
     } else if (u_whichTexture == 0) {
       gl_FragColor = texture2D(u_Sampler0, v_UV);
-    } else {
+    } else if (u_whichTexture == 1) {
+      gl_FragColor = texture2D(u_Sampler1, v_UV); 
+    }   
+    else {
       gl_FragColor = vec4(1.0, 0.2, 0.2, 1.0);
     }
   }`  
@@ -57,7 +63,33 @@ let g_eyeRotation = -45;
 let g_userScrunch = 0.0;
 let a_uv; 
 let u_Sampler0;
+let u_Sampler1;
 let u_whichTexture = -1; 
+let u_ViewMatrix;
+let u_ProjectionMatrix;
+let g_camera;
+
+// Object Pooling 
+let g_kelpStem = null;
+let g_kelpBranch = null;
+let g_kelpLeaf = null;
+
+let g_seaLemonParts = {
+  baseCube: null,
+  middleCube: null,
+  topCube: null,
+  leftEye: null,
+  rightEye: null,
+  gill: null
+};
+
+let g_tempMatrix = null;
+
+
+
+
+
+
 
 function setupWebGL() {
   // Retrieve <canvas> element
@@ -118,6 +150,12 @@ function connectVariablesToGLSL() {
     console.log('Failed to get the storage location of u_Sampler0');
     return false;
   }
+
+  u_Sampler1 = gl.getUniformLocation(gl.program, 'u_Sampler1'); // Get the storage location of u_Sampler
+  if (!u_Sampler1) {
+    console.log('Failed to get the storage location of u_Sampler1');
+    return false;
+  }
   
   // Get the storage location of u_whichTexture
   u_whichTexture = gl.getUniformLocation(gl.program, 'u_whichTexture'); // Get the storage location of u_Sampler
@@ -125,6 +163,21 @@ function connectVariablesToGLSL() {
     console.log('Failed to get the storage location of u_whichTexture');
     return false;
   }
+
+  // Get the storage location of u_ViewMatrix
+  u_ViewMatrix = gl.getUniformLocation(gl.program, 'u_ViewMatrix'); // Get the storage location of u_Sampler
+  if (!u_ViewMatrix) {
+    console.log('Failed to get the storage location of u_ViewMatrix');
+    return false;
+  }
+
+  // Get the storage location of u_ProjectionMatrix
+  u_ProjectionMatrix = gl.getUniformLocation(gl.program, 'u_ProjectionMatrix'); // Get the storage location of u_Sampler
+  if (!u_ProjectionMatrix) {
+    console.log('Failed to get the storage location of u_ProjectionMatrix');
+    return false;
+  }
+
 }
 
 function htmlUI() {
@@ -138,41 +191,48 @@ function htmlUI() {
 }
 
 function initTextures() {
-  var image = new Image(); // Create the image object
-  if (!image) {
+  var image0 = new Image();
+  if (!image0) {
     console.log('Failed to create the image object');
     return false;
   }
-
-  image.onload = function() { sendTextureToTEXTURE0(image); }; // Register the event handler to be called on loading an image
-  image.src = 'sky.jpg'; // Specify the image to be loaded
-  //add more textures here
+  image0.onload = function() { sendTextureToGPU(image0, 0); };
+  image0.src = 'sky.jpg';
+  
+  var image1 = new Image();
+  if (!image1) {
+    console.log('Failed to create the image object');
+    return false;
+  }
+  image1.onload = function() { sendTextureToGPU(image1, 1); };
+  image1.src = 'ground.jpg';
+  
   return true;
 }
 
-function sendTextureToTEXTURE0(image) {
-  var texture = gl.createTexture(); // Create a texture object
+function sendTextureToGPU(image, textureUnit) {
+  var texture = gl.createTexture(); 
   if (!texture) {
     console.log('Failed to create the texture object');
     return false;
   }
-  gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, 1); // Flip the image's y axis
-  gl.activeTexture(gl.TEXTURE0); // Activate texture unit 0
-  gl.bindTexture(gl.TEXTURE_2D, texture); // Bind the texture object to the target
-
-  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR  ); // Set texture parameters
-  // gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+  gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, 1); 
   
-  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGB, gl.RGB, gl.UNSIGNED_BYTE, image); // Specify the color format and type of the pixel data
+  gl.activeTexture(gl.TEXTURE0 + textureUnit);
+  gl.bindTexture(gl.TEXTURE_2D, texture); 
+
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR); 
+  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGB, gl.RGB, gl.UNSIGNED_BYTE, image);
   
-  gl.uniform1i(u_Sampler0, 0); // Pass the texture unit to u_Sampler
+  if (textureUnit === 0) {
+    gl.uniform1i(u_Sampler0, textureUnit); 
+  } else if (textureUnit === 1) {
+    gl.uniform1i(u_Sampler1, textureUnit); 
+  }
+  // Add more textures
 
-  // renderShapes(); // Draw the scene
-  // gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT); // Clear <canvas>
-
-  console.log("Texture loaded");
+  console.log("Texture " + textureUnit + " loaded");
   renderShapes(); // Draw the scene
-
 }
 
 function mouseNavigation() {
@@ -196,32 +256,82 @@ function mouseNavigation() {
       const dx = ev.clientX - g_lastX;
       const dy = ev.clientY - g_lastY;
       
-      // Update rotation angles
-      g_globalAngle -= dx * g_rotationSpeed;
-      g_verticalAngle -= dy * g_rotationSpeed;
+      // Use camera rotation instead of global rotation variables
+      if (dx !== 0) {
+        g_camera.panRight(dx * 0.2);  
+      }
+      
+      // Vertical movement controls up/down camera rotation
+      if (dy !== 0) {
+        g_camera.panUp(-dy * 0.2);  
+      }
       
       g_lastX = ev.clientX;
       g_lastY = ev.clientY;
       
-      // Redraw the scene
       renderShapes();
     }
   };
 
   canvas.onwheel = function(ev) {
-
     ev.preventDefault(); 
     
     if (ev.deltaY > 0) {
-      g_scale =  Math.min(5.0, g_scale + g_zoomSpeed)
+      g_scale = Math.min(5.0, g_scale + g_zoomSpeed)
     } else {
-      
       g_scale = Math.max(0.1, g_scale - g_zoomSpeed)
     }
 
     renderShapes();
   }
 }
+
+function initObjectPool() {
+  // Initialize kelp objects
+  g_kelpStem = new Cube();
+  g_kelpBranch = new Cube();
+  g_kelpLeaf = new Leaf();
+  
+  // Initialize sea lemon objects
+  g_seaLemonParts.baseCube = new Cube();
+  g_seaLemonParts.middleCube = new Cube();
+  g_seaLemonParts.topCube = new Cube();
+  g_seaLemonParts.leftEye = new Leaf();
+  g_seaLemonParts.rightEye = new Leaf();
+  g_seaLemonParts.gill = new Leaf();
+  
+  // Initialize reusable matrix
+  g_tempMatrix = new Matrix4();
+}
+
+var g_map = [
+  [1,1,1,1,1,1,1,1],
+  [1,0,0,0,0,0,0,1],
+  [1,0,0,0,0,0,0,1],
+  [1,0,0,0,0,0,0,1],
+  [1,0,0,0,0,0,0,1],
+  [1,0,0,0,0,0,0,1],
+  [1,0,0,0,0,0,0,1],
+  [1,1,1,1,1,1,1,1]
+]
+
+function drawMap() {
+  var block = new Cube();
+  block.color = [0.2, 0.2, 0.2, 1.0];
+  
+  for (x=0; x<32; x++) {
+    for (y=0; y<32; y++) {
+      if (x==0 || x==31 || y==0 || y==31) {
+        block.matrix.setIdentity();  // Reset matrix
+        block.matrix.translate(0, -0.1, 0);
+        block.matrix.scale(0.3, 0.3, 0.3);
+        block.matrix.translate(x-16, 0, y-16);
+        block.renderFast();
+      }
+    }
+  }
+}
+
 
 function main() {
 
@@ -231,15 +341,18 @@ function main() {
   htmlUI();
 
   mouseNavigation();
-  setupSeaLemonClick(); // Add this to register the click handler
-  initTextures(); // Initialize textures
+  setupSeaLemonClick(); 
+  g_camera = new Camera(canvas);
+  setupKeyboardControls(); 
+  initObjectPool();
+  initTextures(); 
   
   gl.enable(gl.CULL_FACE);
-  gl.cullFace(gl.BACK);
+  gl.cullFace(gl.FRONT);
   gl.enable(gl.DEPTH_TEST);
 
   gl.clearColor(0.0, 0.0, 0.0, 1.0);
-
+  
   // Clear <canvas>
   // renderShapes();
   requestAnimationFrame(tick);
@@ -248,8 +361,8 @@ function main() {
 var g_shapes = []; 
 
 function coordsToGL(ev) {
-  var x = ev.clientX; // x coordinate of a mouse pointer
-  var y = ev.clientY; // y coordinate of a mouse pointer
+  var x = ev.clientX;
+  var y = ev.clientY; 
   var rect = ev.target.getBoundingClientRect();
 
   x = ((x - rect.left) - canvas.width/2)/(canvas.width/2);
@@ -263,7 +376,7 @@ g_seconds = performance.now() / 1000.0 - g_startTime;
 let g_wasAnimating = true; 
 
 function tick() {
-  let startTime = performance.now()
+  // let startTime = performance.now()
   if (g_animation) {
     if (!g_wasAnimating) {
       g_startTime = performance.now() / 1000.0 - g_seconds;
@@ -277,21 +390,31 @@ function tick() {
   updateAnimationAngle();
 
   renderShapes();
-  var duration = performance.now() - startTime;
-  sendTextToHTML("perf", "fpaaas " + 100/duration);
+  // var duration = performance.now() - startTime;
+  // sendTextToHTML("perf", "fpaaas " + 100/duration);
   requestAnimationFrame(tick);
   
 }
 
 function updateAnimationAngle() {
   if (g_animation) {
-    g_jointSlider = 45*Math.sin(g_seconds);
-    g_purpleJoint = 45*Math.cos(g_seconds);
+    const sinValue = Math.sin(g_seconds);
+    const cosValue = Math.cos(g_seconds);
+    g_jointSlider = 45*sinValue;
+    g_purpleJoint = 45*cosValue;
   }
 }
 
+var g_eye = [0, 0, -2]
+var g_at = [0, 0, 0]
+var g_up = [0, 1, 0]
+
 function renderShapes() { 
   // let startTime = performance.now()
+
+  gl.uniformMatrix4fv(u_ProjectionMatrix, false, g_camera.getProjectionMatrix().elements);
+  gl.uniformMatrix4fv(u_ViewMatrix, false, g_camera.getViewMatrix().elements);
+
   var globalRotMat = new Matrix4()
     .scale(g_scale, g_scale, g_scale) 
     .rotate(g_verticalAngle, 1, 0, 0) 
@@ -302,27 +425,81 @@ function renderShapes() {
   gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT); 
 
   
-
+  drawMap();
   kelpStalk(-3,-0.2,4);
   kelpStalk(-2,-0.2,-3);
   kelpStalk(4,-0.2,0);
   seaLemon();
 
-  // var duration = performance.now() - startTime;
-  // sendTextToHTML("perf", "fps " + 1000/duration);
+  var ground = new Cube();
+  ground.textureNum = 1;
+  ground.color = [0.2, 0.2, 0.2, 1.0];
+  ground.matrix.translate(0, -0.101, 0);
+  ground.matrix.scale(10, 0, 10);
+  ground.matrix.translate(-.5,0,-0.5);
+  ground.renderFast();
+
+  renderSky();
 }
 
-function kelpSection(x,y,z,stemToggle) {
+function renderSky() {
+  // Save current GL state
+  gl.depthMask(false);
+  let oldCullFace = gl.getParameter(gl.CULL_FACE_MODE);
+  gl.cullFace(gl.BACK);
+  
+  var skyMatrix = new Matrix4(g_camera.getViewMatrix());
+  skyMatrix.elements[12] = 0;
+  skyMatrix.elements[13] = 0;
+  skyMatrix.elements[14] = 0;
+  
+  var sky = new Cube();
+  sky.textureNum = 0; 
+  sky.matrix.scale(50, 50, 50);
+  sky.matrix.translate(-.5,-.5,-0.5);
 
+  gl.uniformMatrix4fv(u_ViewMatrix, false, skyMatrix.elements);
+  sky.renderFast();
+  
+  gl.uniformMatrix4fv(u_ViewMatrix, false, g_camera.getViewMatrix().elements);
+  
+  gl.depthMask(true);
+  gl.cullFace(oldCullFace);
+}
+
+function setupKeyboardControls() {
+  document.addEventListener('keydown', function(event) {
+    const key = event.key.toLowerCase();
+    const speed = 0.1; 
+    
+    switch(key) {
+      case 'w': g_camera.moveForward(speed); break;
+      case 's': g_camera.moveBackward(speed); break;
+      case 'a': g_camera.moveLeft(speed); break;
+      case 'd': g_camera.moveRight(speed); break;
+      case 'q': g_camera.panLeft(2.0); break;  
+      case 'e': g_camera.panRight(2.0); break;
+    }
+    
+    if (['w','a','s','d','q','e'].includes(key)) {
+      renderShapes();
+    }
+  });
+}
+
+
+function kelpSection(x,y,z,stemToggle) {
+  g_kelpStem.matrix.setIdentity();
+  
   // Main stem
-  var stem = new Cube();
-  stem.color = [0.2, 0.5, 0.0, 1.0];
-  stem.matrix.translate(-0.075, -.25  , -0.075);
-  stem.matrix.scale(0.15, 0.5, 0.15);
-  stem.matrix.translate(x,y,z)
-  stem.matrix.scale(0.5, 0.5, 0.5);
-  stemMatrix = new Matrix4(stem.matrix);
-  stem.render();
+  g_kelpStem.color = [0.2, 0.5, 0.0, 1.0];
+  g_kelpStem.matrix.translate(-0.075, -.25, -0.075);
+  g_kelpStem.matrix.scale(0.15, 0.5, 0.15);
+  g_kelpStem.matrix.translate(x,y,z);
+  g_kelpStem.matrix.scale(0.5, 0.5, 0.5);
+  
+  g_tempMatrix.set(g_kelpStem.matrix);
+  g_kelpStem.renderFast();
 
   // 3 branches with leaves
   const leafSpacing = 0.15; 
@@ -332,36 +509,35 @@ function kelpSection(x,y,z,stemToggle) {
     for (let i = 0; i < 3; i++) {
       const yPos = (leafStartY + i * leafSpacing + 0.25) / 0.5;
       
-      //  branch
-      var branch = new Cube();
-      branch.color = [0.2, 0.6, 0.0, 1.0];
-      branch.matrix = new Matrix4(stemMatrix);
-      branch.matrix.translate(1.5, yPos, 0.5);
+      // Reset branch matrix
+      g_kelpBranch.matrix.set(g_tempMatrix);
+      g_kelpBranch.color = [0.2, 0.6, 0.0, 1.0];
+      g_kelpBranch.matrix.translate(1.5, yPos, 0.5);
 
       const branchAngle = 15 * Math.sin(g_seconds * 1.3 + i * 0.5);
-      branch.matrix.rotate(branchAngle, 0, 1, 0);
-      branch.matrix.rotate(90, 0, 0, 1);
+      g_kelpBranch.matrix.rotate(branchAngle, 0, 1, 0);
+      g_kelpBranch.matrix.rotate(90, 0, 0, 1);
 
-      branch.matrix.scale(0.1, 0.8, 0.4);
-      branch.matrix.translate(0, -0.2, -0.5); 
-      var branchMatrix = new Matrix4(branch.matrix);
-      branch.render();
+      g_kelpBranch.matrix.scale(0.1, 0.8, 0.4);
+      g_kelpBranch.matrix.translate(0, -0.2, -0.5); 
       
-      // Leaf
-      var leaf = new Leaf();
-      leaf.color = [0.0, 0.7, 0.0, 1.0];
-      leaf.matrix = new Matrix4(branchMatrix);
-      leaf.matrix.translate(0, -2, 0); 
-      // leaf.matrix.scale(0.3  , 0.8, 0.3); 
+      // Save branch matrix for leaf
+      // var branchMatrix = new Matrix4(g_kelpBranch.matrix);
+      // g_kelpLeaf.matrix.set(g_kelpBranch.matrix);
+      g_kelpBranch.renderFast();
       
-      leaf.matrix.translate(0.5,1.5, 0.5);
+      // Reset leaf matrix
+      g_kelpLeaf.matrix.set(g_kelpBranch.matrix);
+      g_kelpLeaf.color = [0.0, 0.7, 0.0, 1.0];
+      g_kelpLeaf.matrix.translate(0, -2, 0); 
+      g_kelpLeaf.matrix.translate(0.5, 1.5, 0.5);
 
       const leafAngle = 10 * Math.sin(g_seconds * 1.8 + i * 0.7);
-      leaf.matrix.rotate(leafAngle, 0, 0, 1);
-      leaf.matrix.rotate(8 * Math.cos(g_seconds * 1.2 + i * 0.3), 1, 0, 0);
-      leaf.matrix.scale(2.0, 1.5, 1.0);
+      g_kelpLeaf.matrix.rotate(leafAngle, 0, 0, 1);
+      g_kelpLeaf.matrix.rotate(8 * Math.cos(g_seconds * 1.2 + i * 0.3), 1, 0, 0);
+      g_kelpLeaf.matrix.scale(2.0, 1.5, 1.0);
       
-      leaf.render();
+      g_kelpLeaf.renderFast();
     }
   }
 }
@@ -450,55 +626,51 @@ function seaLemon() {
   let offsetX = -0.2 * scrunchFactor;
   let offsetZ = -0.3 * scrunchFactor;
   
-  // base layer 
-  var baseCube = new Cube();
-  baseCube.textureNum = 0;
-  baseCube.color = [0.9, 0.8, 0.2, 1.0]; 
-  baseCube.matrix.translate(-0.2 - offsetX/2, -0.1, -0.4 - offsetZ);
-  baseCube.matrix.translate(0, 0, 0.8 * (1 - breatheScaleZ) * widthScale/2);
-  baseCube.matrix.scale(0.8 * widthScale, 0.1 * heightScale, 1.6 * widthScale * breatheScaleZ);
-  baseCube.matrix.scale(0.5, 0.5, 0.5);
-  baseCube.render();
+  // base layer
+  g_seaLemonParts.baseCube.matrix.setIdentity();
+  g_seaLemonParts.baseCube.textureNum = -2; // Set to -1 for color
+  g_seaLemonParts.baseCube.color = [0.9, 0.8, 0.2, 1.0]; 
+  g_seaLemonParts.baseCube.matrix.translate(-0.2 - offsetX/2, -0.1, -0.4 - offsetZ);
+  g_seaLemonParts.baseCube.matrix.translate(0, 0, 0.8 * (1 - breatheScaleZ) * widthScale/2);
+  g_seaLemonParts.baseCube.matrix.scale(0.8 * widthScale, 0.1 * heightScale, 1.6 * widthScale * breatheScaleZ);
+  g_seaLemonParts.baseCube.matrix.scale(0.5, 0.5, 0.5);
+  g_seaLemonParts.baseCube.renderFast();
   
-  baseMatrix = new Matrix4(baseCube.matrix);
+  g_tempMatrix.set(g_seaLemonParts.baseCube.matrix);
 
   // mid layer
-  var middleCube = new Cube();
-  middleCube.color = [0.9, 0.75, 0.15, 1.0]; 
-  middleCube.matrix = new Matrix4(baseMatrix);
-  middleCube.matrix.translate(0.06, 0.5, 0.03); 
-  middleCube.matrix.scale(0.7/0.8, (0.12/0.1) * breatheScaleY, 1.4/1.6);  
-  middleCube.render();
+  g_seaLemonParts.middleCube.matrix.set(g_tempMatrix);
+  g_seaLemonParts.middleCube.color = [0.9, 0.75, 0.15, 1.0]; 
+  g_seaLemonParts.middleCube.matrix.translate(0.06, 0.5, 0.03); 
+  g_seaLemonParts.middleCube.matrix.scale(0.7/0.8, (0.12/0.1) * breatheScaleY, 1.4/1.6);  
+  g_seaLemonParts.middleCube.renderFast();
   
   // top layer
-  var topCube = new Cube();
-  topCube.color = [0.85, 0.7, 0.1, 1.0]; 
-  topCube.matrix = new Matrix4(baseMatrix);
-  topCube.matrix.translate(0.19, 0.72, 0.1);  
-  topCube.matrix.scale(0.5/0.8, (0.15/0.1) * breatheScaleY, 1.1/1.6); 
-  topCube.render();
+  g_seaLemonParts.topCube.color = [0.85, 0.7, 0.1, 1.0]; 
+  g_seaLemonParts.topCube.matrix.set(g_tempMatrix);
+  g_seaLemonParts.topCube.matrix.translate(0.19, 0.72, 0.1);  
+  g_seaLemonParts.topCube.matrix.scale(0.5/0.8, (0.15/0.1) * breatheScaleY, 1.1/1.6); 
+  g_seaLemonParts.topCube.renderFast();
 
   // Left eye
-  var leftEye = new Leaf();
-  leftEye.color = [0.9, 0.8, 0.2, 1.0];
-  leftEye.matrix = new Matrix4(baseMatrix);
-  leftEye.matrix.translate(0.25, 2.5, 0.1);
-  leftEye.matrix.scale(0.07, 0.45, 0.03); 
-  leftEye.matrix.rotate(-g_eyeRotation, 0, 0, 1); 
-  leftEye.matrix.scale(2,2,2);
+  g_seaLemonParts.leftEye.color = [0.9, 0.8, 0.2, 1.0];
+  g_seaLemonParts.leftEye.matrix.set(g_tempMatrix);
+  g_seaLemonParts.leftEye.matrix.translate(0.25, 2.5, 0.1);
+  g_seaLemonParts.leftEye.matrix.scale(0.07, 0.45, 0.03); 
+  g_seaLemonParts.leftEye.matrix.rotate(-g_eyeRotation, 0, 0, 1); 
+  g_seaLemonParts.leftEye.matrix.scale(2,2,2);
   
-  leftEye.render();
+  g_seaLemonParts.leftEye.renderFast();
   
   // Right eye
-  var rightEye = new Leaf();
-  rightEye.color = [0.9, 0.8, 0.2, 1.0];
-  rightEye.matrix = new Matrix4(baseMatrix);
-  rightEye.matrix.translate(0.75, 2.5, 0.1); 
-  rightEye.matrix.scale(0.07, 0.45, 0.03); 
-  rightEye.matrix.rotate(g_eyeRotation, 0, 0, 1); 
-  rightEye.matrix.scale(2,2,2);
+  g_seaLemonParts.rightEye.color = [0.9, 0.8, 0.2, 1.0];
+  g_seaLemonParts.rightEye.matrix.set(g_tempMatrix);
+  g_seaLemonParts.rightEye.matrix.translate(0.75, 2.5, 0.1); 
+  g_seaLemonParts.rightEye.matrix.scale(0.07, 0.45, 0.03); 
+  g_seaLemonParts.rightEye.matrix.rotate(g_eyeRotation, 0, 0, 1); 
+  g_seaLemonParts.rightEye.matrix.scale(2,2,2);
   
-  rightEye.render();
+  g_seaLemonParts.rightEye.renderFast();
 
   // gills
   const baseGillColor = [1.0, 1.0, 0.4, 0.7];  
@@ -514,16 +686,15 @@ function seaLemon() {
       const x = Math.cos(angle) * gillRadius;
       const z = Math.sin(angle) * (gillRadius/2);
       
-      var gill = new Leaf();
-      gill.color = baseGillColor;  
+      g_seaLemonParts.gill.color = baseGillColor;  
       
-      gill.matrix = new Matrix4(baseMatrix);
+      g_seaLemonParts.gill.matrix.set(g_tempMatrix);
       
-      gill.matrix.translate(0.5 + x, 2.5, 0.7 + z);
+      g_seaLemonParts.gill.matrix.translate(0.5 + x, 2.5, 0.7 + z);
       
-      gill.matrix.scale(0.1 * breatheFactor, 0.7 * breatheFactor, 0.05 * breatheFactor);
+      g_seaLemonParts.gill.matrix.scale(0.1 * breatheFactor, 0.7 * breatheFactor, 0.05 * breatheFactor);
       
-      gill.render();
+      g_seaLemonParts.gill.renderFast();
     }
   }
   createGills(12, 0.2, baseGillColor);

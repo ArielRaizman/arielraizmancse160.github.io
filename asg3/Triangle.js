@@ -122,9 +122,8 @@ function drawStar(x, y, size) {
 }
 
 
-
-
-
+var g_vertexBuffer = null;
+var g_uvBuffer = null;
 
 
 function drawTriangle3D(gl,vertices) {
@@ -156,31 +155,39 @@ function drawTriangle3D(gl,vertices) {
   // console.log("drawTriangle3D")
 }
 
-function drawTriangle3DUV(gl,vertices,uv) {
-  var n  = 3;
-
-  var vertexBuffer = gl.createBuffer();
-  if (!vertexBuffer) {
+function initDrawTriangle3D() {
+  g_vertexBuffer = gl.createBuffer(); // Create a buffer object
+  if (!g_vertexBuffer) {
     console.log('Failed to create the buffer object');
     return -1;
   }
-
-  gl.bindBuffer(gl.ARRAY_BUFFER, vertexBuffer);
-
-  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(vertices), gl.DYNAMIC_DRAW);
-
+  gl.bindBuffer(gl.ARRAY_BUFFER, g_vertexBuffer); 
   gl.vertexAttribPointer(a_Position, 3, gl.FLOAT, false, 0, 0);
+  gl.enableVertexAttribArray(a_Position)
 
-  gl.enableVertexAttribArray(a_Position);
-
-  var uvBuffer = gl.createBuffer();
-  if (!uvBuffer) {
+  g_uvBuffer = gl.createBuffer(); 
+  if (!g_uvBuffer) {
     console.log('Failed to create the buffer object');
     return -1;
   }
-  gl.bindBuffer(gl.ARRAY_BUFFER, uvBuffer);
-  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(uv), gl.DYNAMIC_DRAW);
+  gl.bindBuffer(gl.ARRAY_BUFFER, g_uvBuffer); 
   gl.vertexAttribPointer(a_uv, 2, gl.FLOAT, false, 0, 0);
-  gl.enableVertexAttribArray(a_uv);
+  gl.enableVertexAttribArray(a_uv)
+}
+
+
+function drawTriangle3DUV(vertices, uv) {
+  var n = vertices.length / 3;
+  if (g_vertexBuffer == null) {
+    initDrawTriangle3D(); 
+  }
+  
+  const verticesTyped = vertices instanceof Float32Array ? vertices : new Float32Array(vertices);
+  const uvTyped = uv instanceof Float32Array ? uv : new Float32Array(uv);
+  
+  gl.bindBuffer(gl.ARRAY_BUFFER, g_vertexBuffer);
+  gl.bufferData(gl.ARRAY_BUFFER, verticesTyped, gl.DYNAMIC_DRAW);
+  gl.bindBuffer(gl.ARRAY_BUFFER, g_uvBuffer);
+  gl.bufferData(gl.ARRAY_BUFFER, uvTyped, gl.DYNAMIC_DRAW);
   gl.drawArrays(gl.TRIANGLES, 0, n);
 }
