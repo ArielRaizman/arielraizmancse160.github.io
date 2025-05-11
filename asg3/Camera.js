@@ -1,10 +1,16 @@
 class Camera {
     constructor(canvasElement) {
-      this.fov = 60;
+      this.fov = 90;
       this.canvas = canvasElement;
-      this.eye = new Vector3([0, 0, 0]);
-      this.at = new Vector3([0, 0, -1]);
+      this.eye = new Vector3([0, 0.8, 3]);
+      this.at = new Vector3([0, 0.8, 0]);
       this.up = new Vector3([0, 1, 0]);
+      
+      this.velocity = new Vector3([0, 0, 0]);
+      this.gravity = 0.001;
+      this.isJumping = false;
+      this.jumpForce = 0.03;
+      this.eyeHeight = 0.5; 
       
       this.viewMatrix = new Matrix4();
       this.updateViewMatrix();
@@ -31,61 +37,54 @@ class Camera {
     }
     
     moveForward(speed) {
+      const eyeToLookYDiff = this.at.elements[1] - this.eye.elements[1];
+      
       let f = new Vector3();
       f.set(this.at);
       f.sub(this.eye);
+      f.elements[1] = 0;
       f.normalize();
       f.mul(speed);
       
-      this.eye.add(f);
-      this.at.add(f);
+      this.eye.elements[0] += f.elements[0];
+      this.eye.elements[2] += f.elements[2];
+      
+      this.at.elements[0] += f.elements[0];
+      this.at.elements[1] = this.eye.elements[1] + eyeToLookYDiff;
+      this.at.elements[2] += f.elements[2];
       
       this.updateViewMatrix();
     }
     
     moveBackward(speed) {
-      let b = new Vector3();
-      b.set(this.eye);
-      b.sub(this.at);
-      b.normalize();
-      b.mul(speed);
-      
-      this.eye.add(b);
-      this.at.add(b);
-      
-      this.updateViewMatrix();
+      this.moveForward(-speed);
     }
     
     moveLeft(speed) {
+      const eyeToLookYDiff = this.at.elements[1] - this.eye.elements[1];
+      
       let f = new Vector3();
       f.set(this.at);
       f.sub(this.eye);
+      f.elements[1] = 0; 
       
       let s = new Vector3();
       s = Vector3.cross(this.up, f);
       s.normalize();
       s.mul(speed);
       
-      this.eye.add(s);
-      this.at.add(s);
+      this.eye.elements[0] += s.elements[0];
+      this.eye.elements[2] += s.elements[2];
+      
+      this.at.elements[0] += s.elements[0];
+      this.at.elements[1] = this.eye.elements[1] + eyeToLookYDiff;
+      this.at.elements[2] += s.elements[2];
       
       this.updateViewMatrix();
     }
     
     moveRight(speed) {
-      let f = new Vector3();
-      f.set(this.at);
-      f.sub(this.eye);
-      
-      let s = new Vector3();
-      s = Vector3.cross(f, this.up);
-      s.normalize();
-      s.mul(speed);
-      
-      this.eye.add(s);
-      this.at.add(s);
-      
-      this.updateViewMatrix();
+      this.moveLeft(-speed);
     }
     
     panLeft(alpha) {
@@ -108,25 +107,80 @@ class Camera {
       this.panLeft(-alpha);
     }
 
-  panUp(alpha) {
-    let f = new Vector3();
-    f.set(this.at);
-    f.sub(this.eye);
+    panUp(alpha) {
+      let f = new Vector3();
+      f.set(this.at);
+      f.sub(this.eye);
+      
+      let right = new Vector3();
+      right = Vector3.cross(f, this.up);
+      right.normalize();
+      
+      let rotationMatrix = new Matrix4();
+      rotationMatrix.setRotate(alpha, right.elements[0], right.elements[1], right.elements[2]);
+      
+      let f_prime = rotationMatrix.multiplyVector3(f);
+      
+      this.at.set(this.eye);
+      this.at.add(f_prime);
+      
+      this.updateViewMatrix();
+    }
     
-    let right = new Vector3();
-    right = Vector3.cross(f, this.up);
-    right.normalize();
+    jump() {
+      if (!this.isJumping) {
+        this.velocity.elements[1] = this.jumpForce;
+        this.isJumping = true;
+      }
+    }
     
-    let rotationMatrix = new Matrix4();
-    rotationMatrix.setRotate(alpha, right.elements[0], right.elements[1], right.elements[2]);
+    checkGround() {
+      const mapX = Math.floor((this.eye.elements[0] * 3) + 16);
+      const mapZ = Math.floor((this.eye.elements[2] * 3) + 16);
+      
+      if (typeof g_map !== 'undefined' && 
+          mapX >= 0 && mapX < 32 && mapZ >= 0 && mapZ < 32 && 
+          g_map[mapZ] && g_map[mapZ][mapX] !== undefined) {
+        
+        let terrainHeight = 0;
+        let cellValue = g_map[mapZ][mapX]; 
+        
+        if (Array.isArray(cellValue)) {
+          terrainHeight = -0.1 + (cellValue[0] * 0.3);
+        } else {
+          terrainHeight = -0.1 + (cellValue * 0.3);
+        }        
+        return { 
+          isOnGround: true, 
+          height: terrainHeight 
+        };
+      }
+      
+      return { 
+        isOnGround: false, 
+        height: -10 
+      };
+    }
     
-    let f_prime = rotationMatrix.multiplyVector3(f);
-    
-    this.at.set(this.eye);
-    this.at.add(f_prime);
-    
-    this.updateViewMatrix();
-  }
+    update() {
+      const viewYOffset = this.at.elements[1] - this.eye.elements[1];
+      
+      this.velocity.elements[1] -= this.gravity;
+      
+      this.eye.elements[1] += this.velocity.elements[1];
+      
+      const groundInfo = this.checkGround();
+      
+      if (groundInfo.isOnGround && this.eye.elements[1] <= groundInfo.height + this.eyeHeight) {
+        this.eye.elements[1] = groundInfo.height + this.eyeHeight;
+        this.velocity.elements[1] = 0;
+        this.isJumping = false;
+      }
+      
+      this.at.elements[1] = this.eye.elements[1] + viewYOffset;
+      
+      this.updateViewMatrix();
+    }
     
     getViewMatrix() {
       return this.viewMatrix;
@@ -139,4 +193,4 @@ class Camera {
     updateAspectRatio() {
       this.updateProjectionMatrix();
     }
-  }
+}

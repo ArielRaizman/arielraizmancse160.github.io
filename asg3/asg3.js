@@ -68,6 +68,7 @@ let u_whichTexture = -1;
 let u_ViewMatrix;
 let u_ProjectionMatrix;
 let g_camera;
+let g_seaLemons = [];
 
 // Object Pooling 
 let g_kelpStem = null;
@@ -85,11 +86,7 @@ let g_seaLemonParts = {
 
 let g_tempMatrix = null;
 
-
-
-
-
-
+let g_blocks = []; // Array to store placed blocks
 
 function setupWebGL() {
   // Retrieve <canvas> element
@@ -186,7 +183,7 @@ function htmlUI() {
 
   document.getElementById('eyerotation').addEventListener('mousemove', function() { g_eyeRotation = this.value; });
   document.getElementById('scrunchslide').addEventListener('mousemove', function() { g_userScrunch = this.value; });
-  document.getElementById('viewangle').addEventListener('mousemove', function() { g_globalAngle = this.value; });
+  // document.getElementById('viewangle').addEventListener('mousemove', function() { g_globalAngle = this.value; });
 
 }
 
@@ -273,17 +270,17 @@ function mouseNavigation() {
     }
   };
 
-  canvas.onwheel = function(ev) {
-    ev.preventDefault(); 
+  // canvas.onwheel = function(ev) {
+  //   ev.preventDefault(); 
     
-    if (ev.deltaY > 0) {
-      g_scale = Math.min(5.0, g_scale + g_zoomSpeed)
-    } else {
-      g_scale = Math.max(0.1, g_scale - g_zoomSpeed)
-    }
+  //   if (ev.deltaY > 0) {
+  //     g_scale = Math.min(5.0, g_scale + g_zoomSpeed)
+  //   } else {
+  //     g_scale = Math.max(0.1, g_scale - g_zoomSpeed)
+  //   }
 
-    renderShapes();
-  }
+  //   renderShapes();
+  // }
 }
 
 function initObjectPool() {
@@ -305,33 +302,146 @@ function initObjectPool() {
 }
 
 var g_map = [
-  [1,1,1,1,1,1,1,1],
-  [1,0,0,0,0,0,0,1],
-  [1,0,0,0,0,0,0,1],
-  [1,0,0,0,0,0,0,1],
-  [1,0,0,0,0,0,0,1],
-  [1,0,0,0,0,0,0,1],
-  [1,0,0,0,0,0,0,1],
-  [1,1,1,1,1,1,1,1]
+  [3,3,3,3,3,2,2,2,2,1,1,1,1,1,1,1,1,1,1,1,1,1,1,2,2,2,3,3,3,3,3,3],
+  [3,4,4,3,2,2,1,1,1,1,0,0,0,0,0,0,0,0,0,0,0,0,1,1,2,2,3,3,4,4,3,3],
+  [3,4,4,3,2,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,2,3,3,4,4,3,3],
+  [3,3,3,2,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,2,2,3,3,3,3,3],
+  [2,2,2,1,1,0,0,0,0,0,0,0,0,0,0,1,1,0,0,0,0,0,0,0,0,1,2,2,2,3,3,2],
+  [2,1,1,1,0,0,0,0,0,0,0,0,0,0,0,1,2,1,0,0,0,0,0,0,0,0,1,1,2,2,2,2],
+  [1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,1,0,0,0,0,0,0,0,0,0,1,1,2,2,1],
+  [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,1,1],
+  [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,1],
+  [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1],
+  [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
+  [1,0,0,0,0,0,0,0,0,0,0,0,1,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
+  [1,0,0,0,0,0,0,0,0,0,0,1,2,2,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
+  [1,0,0,0,0,0,0,0,0,0,1,2,3,2,2,1,0,0,0,[1,1],0,0,0,0,0,0,0,0,0,0,0,1],
+  [1,0,0,0,0,0,0,0,0,0,1,2,2,2,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
+  [1,0,0,0,0,0,0,0,0,0,1,1,1,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
+  [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
+  [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
+  [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
+  [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
+  [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,2,2,1,0,0,0,0,0,0,1],
+  [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,2,2,3,4,3,2,1,0,0,0,0,0,1],
+  [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,2,3,3,2,1,0,0,0,0,0,0,1],
+  [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,2,2,1,0,0,0,0,0,0,0,1],
+  [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,0,0,0,0,0,0,0,0,1],
+  [1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1],
+  [2,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,2],
+  [2,2,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,2,2],
+  [3,2,2,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,2,2,3],
+  [3,3,2,2,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,2,2,3,3]
 ]
+
+
+// var g_map = [
+//   [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+//   [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+//   [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+//   [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+//   [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+//   [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+//   [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+//   [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+//   [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+//   [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+//   [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+//   [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+//   [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+//   [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+//   [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+//   [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+//   [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+//   [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+//   [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+//   [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+//   [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+//   [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+//   [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+//   [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+//   [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+//   [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+//   [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+//   [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+//   [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+//   [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]
+// ]
 
 function drawMap() {
   var block = new Cube();
-  block.color = [0.2, 0.2, 0.2, 1.0];
+  block.color = [0.4, 0.3, 0.2, 1.0];
   
-  for (x=0; x<32; x++) {
-    for (y=0; y<32; y++) {
-      if (x==0 || x==31 || y==0 || y==31) {
-        block.matrix.setIdentity();  // Reset matrix
-        block.matrix.translate(0, -0.1, 0);
+  for (let x = 0; x < g_map.length; x++) {
+    for (let y = 0; y < g_map[x].length; y++) {
+      let cellValue = g_map[x][y];
+      let height = 0;
+      let placeKelp = false;
+      
+      if (Array.isArray(cellValue)) {
+        height = cellValue[0];
+        // console.log("block placed?", cellValue[0]);
+        placeKelp = cellValue[1] === 1;
+      } else {
+        height = cellValue;
+      }
+      
+      if (height === 0) continue;
+      
+      for (let h = 0; h < height; h++) {
+        block.matrix.setIdentity();
+        block.matrix.translate(0, -0.1 + (h * 0.3), 0); 
         block.matrix.scale(0.3, 0.3, 0.3);
-        block.matrix.translate(x-16, 0, y-16);
+        block.matrix.translate(x - 16, 0, y - 16); 
         block.renderFast();
       }
+      
+      // Place kelp if specified
+      // if (placeKelp) {
+      //   // Position kelp on top of the highest block
+      //   const kelpX = (x - 16) / 3;
+      //   const kelpY = -0.1 + (height * 0.3);
+      //   const kelpZ = (y - 16) / 3;
+        
+      //   kelpStalk(kelpX, kelpY, kelpZ);
+      // }
     }
   }
 }
 
+function initSeaLemons() {
+  g_seaLemons.push({
+    position: [0, 0, 0],
+    scale: 0.4,
+    rotX: 0,
+    rotY: 320,
+    rotZ: 0
+  });
+  
+  g_seaLemons.push({
+    position: [3, 0, 0.5],
+    scale: 0.4,
+    rotX: 0,
+    rotY: 200,
+    rotZ: 0
+  });
+  g_seaLemons.push({
+    position: [-3, 0.3, 3.5],
+    scale: 0.4,
+    rotX: 0,
+    rotY: 200,
+    rotZ: 0
+  });
+
+  g_seaLemons.push({
+    position: [-2.5, 0, -3.5],
+    scale: 0.4,
+    rotX: 0,
+    rotY: 260,
+    rotZ: 0
+  });
+  sendTextToHTML("seaLemonCount", "Sea Lemons Left: " + (g_seaLemons.length));
+}
 
 function main() {
 
@@ -345,6 +455,7 @@ function main() {
   g_camera = new Camera(canvas);
   setupKeyboardControls(); 
   initObjectPool();
+  initSeaLemons();
   initTextures(); 
   
   gl.enable(gl.CULL_FACE);
@@ -388,12 +499,14 @@ function tick() {
   }
 
   updateAnimationAngle();
+  
+  g_camera.update();
+  checkSeaLemonCollisions();
 
   renderShapes();
   // var duration = performance.now() - startTime;
   // sendTextToHTML("perf", "fpaaas " + 100/duration);
   requestAnimationFrame(tick);
-  
 }
 
 function updateAnimationAngle() {
@@ -426,10 +539,11 @@ function renderShapes() {
 
   
   drawMap();
+  drawBlocks();
   kelpStalk(-3,-0.2,4);
-  kelpStalk(-2,-0.2,-3);
-  kelpStalk(4,-0.2,0);
-  seaLemon();
+  kelpStalk(-13,-0.2,-6);
+  kelpStalk(15,0.8,10);
+  drawSeaLemons();
 
   var ground = new Cube();
   ground.textureNum = 1;
@@ -438,12 +552,25 @@ function renderShapes() {
   ground.matrix.scale(10, 0, 10);
   ground.matrix.translate(-.5,0,-0.5);
   ground.renderFast();
-
   renderSky();
 }
 
+function drawSeaLemons() {
+  for (let i = 0; i < g_seaLemons.length; i++) {
+    const lemon = g_seaLemons[i];
+    seaLemon(
+      lemon.position[0], 
+      lemon.position[1], 
+      lemon.position[2], 
+      lemon.scale,
+      lemon.rotX,
+      lemon.rotY,
+      lemon.rotZ
+    );
+  }
+}
+
 function renderSky() {
-  // Save current GL state
   gl.depthMask(false);
   let oldCullFace = gl.getParameter(gl.CULL_FACE_MODE);
   gl.cullFace(gl.BACK);
@@ -479,14 +606,90 @@ function setupKeyboardControls() {
       case 'd': g_camera.moveRight(speed); break;
       case 'q': g_camera.panLeft(2.0); break;  
       case 'e': g_camera.panRight(2.0); break;
+      case ' ': g_camera.jump(); break; 
+      
+      case '1':
+        const cameraPos = g_camera.eye;
+        const forward = new Vector3();
+        forward.set(g_camera.at);
+        forward.sub(g_camera.eye);
+        forward.normalize();
+        
+        const placePos = new Vector3();
+        placePos.set(forward);
+        placePos.mul(0.5);
+        placePos.add(cameraPos);
+        
+        g_blocks.push({
+          position: [placePos.elements[0], placePos.elements[1], placePos.elements[2]],
+          size: 0.3, 
+          color: [0.6, 0.6, 0.6, 1.0] 
+        });
+        
+        console.log("Placed block at", placePos.elements);
+        break;
+        
+      case '2':
+        const camPos = g_camera.eye;
+        const camForward = new Vector3();
+        camForward.set(g_camera.at);
+        camForward.sub(g_camera.eye);
+        camForward.normalize();
+        
+        let closestBlock = -1;
+        let closestDistance = 5.0;
+        
+        for (let i = 0; i < g_blocks.length; i++) {
+          const blockPos = g_blocks[i].position;
+          const blockSize = g_blocks[i].size;
+          
+          const blockVec = new Vector3([
+            blockPos[0] - camPos.elements[0],
+            blockPos[1] - camPos.elements[1],
+            blockPos[2] - camPos.elements[2]
+          ]);
+          
+          const distance = blockVec.magnitude();
+          
+          blockVec.normalize();
+          
+          const dotProduct = blockVec.elements[0] * camForward.elements[0] +
+                            blockVec.elements[1] * camForward.elements[1] +
+                            blockVec.elements[2] * camForward.elements[2];
+          
+          if (dotProduct > 0.7 && distance < closestDistance) {
+            closestDistance = distance;
+            closestBlock = i;
+          }
+        }
+        
+        if (closestBlock !== -1) {
+          console.log("Breaking block at", g_blocks[closestBlock].position);
+          g_blocks.splice(closestBlock, 1);
+        }
+        break;
     }
     
-    if (['w','a','s','d','q','e'].includes(key)) {
+    if (['w','a','s','d','q','e','1','2',' '].includes(key)) {
       renderShapes();
     }
   });
 }
 
+function drawBlocks() {
+  var block = new Cube();
+  
+  for (let i = 0; i < g_blocks.length; i++) {
+    const blockData = g_blocks[i];
+    
+    block.matrix.setIdentity();
+    block.color = blockData.color;
+    block.matrix.translate(blockData.position[0], blockData.position[1], blockData.position[2]);
+    block.matrix.scale(blockData.size, blockData.size, blockData.size);
+    block.matrix.translate(-0.5, -0.5, -0.5); // Center the block
+    block.renderFast();
+  }
+}
 
 function kelpSection(x,y,z,stemToggle) {
   g_kelpStem.matrix.setIdentity();
@@ -585,7 +788,7 @@ function setupSeaLemonClick() {
   });
 }
 
-function seaLemon() {
+function seaLemon(x = 0, y = 0, z = 0, scale = 1.0, rotX = 0, rotY = 0, rotZ = 0) {
   let totalCycleTime = g_scrunchDuration.scrunchUp + g_scrunchDuration.hold + g_scrunchDuration.scrunchDown;
   
   // shift click scrunching
@@ -626,9 +829,17 @@ function seaLemon() {
   let offsetX = -0.2 * scrunchFactor;
   let offsetZ = -0.3 * scrunchFactor;
   
+  let baseMatrix = new Matrix4();
+  baseMatrix.translate(x, y, z);
+  baseMatrix.rotate(rotX, 1, 0, 0);
+  baseMatrix.rotate(rotY, 0, 1, 0);
+  baseMatrix.rotate(rotZ, 0, 0, 1);
+  baseMatrix.scale(scale, scale, scale);
+  
   // base layer
   g_seaLemonParts.baseCube.matrix.setIdentity();
-  g_seaLemonParts.baseCube.textureNum = -2; // Set to -1 for color
+  g_seaLemonParts.baseCube.matrix.multiply(baseMatrix);
+  g_seaLemonParts.baseCube.textureNum = -2;
   g_seaLemonParts.baseCube.color = [0.9, 0.8, 0.2, 1.0]; 
   g_seaLemonParts.baseCube.matrix.translate(-0.2 - offsetX/2, -0.1, -0.4 - offsetZ);
   g_seaLemonParts.baseCube.matrix.translate(0, 0, 0.8 * (1 - breatheScaleZ) * widthScale/2);
@@ -703,4 +914,26 @@ function seaLemon() {
 
 function sendTextToHTML(id, text) {
   document.getElementById(id).innerHTML = text;
+}
+
+function checkSeaLemonCollisions() {
+  const cameraPos = g_camera.eye;
+  const collisionDistance = 0.6; 
+  
+  for (let i = g_seaLemons.length - 1; i >= 0; i--) {
+    const lemon = g_seaLemons[i];
+    
+    const dx = cameraPos.elements[0] - lemon.position[0];
+    const dy = cameraPos.elements[1] - lemon.position[1];
+    const dz = cameraPos.elements[2] - lemon.position[2];
+    
+    const distance = Math.sqrt(dx*dx + dy*dy + dz*dz);
+    
+    if (distance < collisionDistance) {
+      console.log("Touched a sea lemon! Removing it.");
+      
+      g_seaLemons.splice(i, 1);
+      sendTextToHTML("seaLemonCount", "Sea Lemons Left: " + (g_seaLemons.length));
+    }
+  }
 }
