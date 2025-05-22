@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Change a point color</title>
+  </head>
+
+  <body onload="main()">
+    <span style="width: 20%;">
+    <canvas id="webgl" width="800" height="800">
+    Please use a browser that supports "canvas"
+    </canvas>
+
+    <br />
+    <p id="seaLemonCount">XXX</p>
+    additional info: <br />
+    movement is wasd and you can click and drag with your mouse to look around, or pan with qe<br />
+    place and break blocks with 1 or 2 respectively<br />
+    jump with space, dont fall off the edge, you can climb the terrain<br />
+    collect all 4 sea lemons :)<br />
+    <button id="on">ON</button>
+    <button id="off">OFF</button>
+    <button id="normalon">Normal On</button>
+    <button id="normaloff">Normal Off</button>
+    scrunchiness<input type="range" min="-65" max= "65" value="0" class="slider" id="scrunchslide" />
+    eye angle<input type="range" min="-50" max= "50" value="-45" class="slider" id="eyerotation" />
+    <!-- view angle<input type="range" min="-50" max= "50" value="0" class="slider" id="viewangle" /> -->
+    <br />
+    <br />
+    <br />
+    
+  </span>
+      <script srsc="../lib/webgl-utils.js"></script>
+      <script src="../lib/webgl-debug.js"></script>
+      <script src="../lib/cuon-utils.js"></script>
+    <script src="../lib/cuon-matrix-cse160.js"></script>
+    <script src="asg4.js"></script>
+    <script src="Cube.js"></script>
+    <script src="Leaf.js"></script>
+    <script src="Triangle.js"></script>
+    <script src="Camera.js"></script>
+  </body>
+</html>
