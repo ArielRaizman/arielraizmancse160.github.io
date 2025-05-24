@@ -34,7 +34,14 @@ var FSHADER_SOURCE =
   uniform vec3 u_LightPos;
   uniform vec3 u_CameraPos;
   uniform bool u_LightingOn;
-  uniform vec3 u_LightColor;  
+  uniform vec3 u_LightColor;
+  uniform vec3 u_SpotlightPos;
+  uniform vec3 u_SpotlightDir;
+  uniform float u_SpotlightCutoff;
+  uniform float u_SpotlightOuterCutoff;
+  uniform vec3 u_SpotlightColor;
+  uniform bool u_SpotlightOn;
+  
   void main() {
     // Set the base color based on texture/color settings
     if (u_whichTexture == -2) {
@@ -53,27 +60,57 @@ var FSHADER_SOURCE =
     }
     
     if (u_LightingOn) {
+      vec3 N = normalize(v_Normal);
+      vec3 baseColor = vec3(gl_FragColor);
+      vec3 ambient = baseColor * 0.3;
+      vec3 finalColor = ambient;
+      
+      // Point light
       vec3 lightVector = u_LightPos - vec3(v_VertPos);
       float r = length(lightVector);
       vec3 L = normalize(lightVector);
-      vec3 N = normalize(v_Normal);
       float NdotL = max(dot(N, L), 0.0);
-  
-      // Use light color in lighting calculations
-      vec3 diffuse = vec3(gl_FragColor) * NdotL * u_LightColor;
-      vec3 ambient = vec3(gl_FragColor) * 0.3;
+      vec3 diffuse = baseColor * NdotL * u_LightColor;
       
       if (u_whichTexture == -1 || u_whichTexture == -2) {
         vec3 R = reflect(-L, N);
         vec3 E = normalize(u_CameraPos - vec3(v_VertPos));
         float specular = pow(max(dot(E, R), 0.0), 32.0);
-        gl_FragColor = vec4(specular * u_LightColor + diffuse + ambient, 1.0);  
-      } else {
-        // No specular for textured objects
-        gl_FragColor = vec4(diffuse + ambient, 1.0);
+        finalColor += specular * u_LightColor;
       }
+      
+      finalColor += diffuse;
+      
+      // Spotlight
+      if (u_SpotlightOn) {
+        vec3 spotLightVector = u_SpotlightPos - vec3(v_VertPos);
+        vec3 SL = normalize(spotLightVector);
+        float SLdist = length(spotLightVector);
+        float SLdot = max(dot(N, SL), 0.0);
+        
+        vec3 spotlightDiffuse = vec3(0.0);
+
+        float cosTheta = dot(SL, normalize(-u_SpotlightDir));
+        float epsilon = u_SpotlightCutoff - u_SpotlightOuterCutoff;
+        float intensity = clamp((cosTheta - u_SpotlightOuterCutoff) / epsilon, 0.0, 1.0);
+        
+        if (intensity > 0.0) {
+          float attenuation = 1.0 / (1.0 + 0.1 * SLdist + 0.01 * SLdist * SLdist);
+          spotlightDiffuse = baseColor * SLdot * u_SpotlightColor * intensity * attenuation;
+          
+          if (u_whichTexture == -1 || u_whichTexture == -2) {
+            vec3 SR = reflect(-SL, N);
+            vec3 SE = normalize(u_CameraPos - vec3(v_VertPos));
+            float spotSpecular = pow(max(dot(SE, SR), 0.0), 64.0);
+            finalColor += spotSpecular * u_SpotlightColor * intensity * attenuation;
+          }
+          
+          finalColor += spotlightDiffuse;
+        }
+      }
+      
+      gl_FragColor = vec4(finalColor, 1.0);
     }
-    // If lighting is off, the original color is used without modification
   }`  
 
 let canvas;
@@ -110,6 +147,12 @@ let u_cameraPos;
 let g_lightingOn = true; 
 let u_lightingOn;
 let g_lightColor = [1, 1, 1, 1]; 
+let g_spotlightOn = true; 
+let g_spotlightPos = [0, 2, 0]; 
+let g_spotlightDir = [0, -1, 0]; 
+let g_spotlightCutoff = Math.cos(30 * Math.PI / 180); 
+let g_spotlightOuterCutoff = Math.cos(45 * Math.PI / 180); 
+let g_spotlightColor = [1.0, 1.0, 1.0];
 
 // Object Pooling 
 let g_kelpStem = null;
@@ -245,6 +288,18 @@ function connectVariablesToGLSL() {
     console.log('Failed to get the storage location of u_LightColor');
     return;
   }
+
+  u_SpotlightPos = gl.getUniformLocation(gl.program, 'u_SpotlightPos');
+  u_SpotlightDir = gl.getUniformLocation(gl.program, 'u_SpotlightDir');
+  u_SpotlightCutoff = gl.getUniformLocation(gl.program, 'u_SpotlightCutoff');
+  u_SpotlightOuterCutoff = gl.getUniformLocation(gl.program, 'u_SpotlightOuterCutoff');
+  u_SpotlightColor = gl.getUniformLocation(gl.program, 'u_SpotlightColor');
+  u_SpotlightOn = gl.getUniformLocation(gl.program, 'u_SpotlightOn');
+
+  if (!u_SpotlightPos || !u_SpotlightDir || !u_SpotlightCutoff || 
+      !u_SpotlightOuterCutoff || !u_SpotlightColor || !u_SpotlightOn) {
+    console.log('Failed to get spotlight uniform locations');
+  }
 }
 
 function htmlUI() {
@@ -265,6 +320,8 @@ function htmlUI() {
   document.getElementById('lightZ').addEventListener('mousemove', function() { g_lightPos[2] = this.value/100; renderShapes();});
   // document.getElementById('viewangle').addEventListener('mousemove', function() { g_globalAngle = this.value; });
 
+  document.getElementById('spoton').onclick = function() { g_spotlightOn = true; renderShapes(); }
+  document.getElementById('spotoff').onclick = function() { g_spotlightOn = false; renderShapes(); }
 }
 
 function initTextures() {
@@ -470,6 +527,13 @@ function renderShapes() {
   gl.uniform1i(u_lightingOn, g_lightingOn);
   gl.uniform3f(u_lightColor, g_lightColor[0], g_lightColor[1], g_lightColor[2]);
 
+  gl.uniform3f(u_SpotlightPos, g_spotlightPos[0], g_spotlightPos[1], g_spotlightPos[2]);
+  gl.uniform3f(u_SpotlightDir, g_spotlightDir[0], g_spotlightDir[1], g_spotlightDir[2]);
+  gl.uniform1f(u_SpotlightCutoff, g_spotlightCutoff);
+  gl.uniform1f(u_SpotlightOuterCutoff, g_spotlightOuterCutoff);
+  gl.uniform3f(u_SpotlightColor, g_spotlightColor[0], g_spotlightColor[1], g_spotlightColor[2]);
+  gl.uniform1i(u_SpotlightOn, g_spotlightOn);
+
   // drawMap();
   // drawBlocks();
   // kelpStalk(-3,-0.2,4);
@@ -507,11 +571,22 @@ function renderShapes() {
   sphere.render();
 
   var light = new Cube();
-  light.color = g_lightColor; // Use the variable instead of hard-coded color
+  light.color = g_lightColor;
   light.matrix.translate(g_lightPos[0], g_lightPos[1], g_lightPos[2]);
   light.matrix.scale(-0.1, -0.1, -0.1);
   light.matrix.translate(-0.5, -0.5, -0.5);
   light.renderFast();
+
+  // Draw spotlight cone
+  if (g_spotlightOn) {
+    var spotCone = new Cube();
+    spotCone.color = g_spotlightColor;
+    spotCone.textureNum = -2;
+    spotCone.matrix.translate(g_spotlightPos[0], g_spotlightPos[1], g_spotlightPos[2]);
+    spotCone.matrix.scale(0.1, 0.1, 0.1);
+    spotCone.matrix.translate(-0.5, -0.5, -0.5);
+    spotCone.renderFast();
+  }
 }
 
 function drawSeaLemons() {
