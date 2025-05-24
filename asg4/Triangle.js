@@ -222,19 +222,25 @@ function drawTriangle3DUV(vertices, uv) {
   gl.drawArrays(gl.TRIANGLES, 0, n);
 }
 
-// function drawTriangle3DUVNormal(vertices, uv, normals) {
-//   var n = vertices.length / 3;
-//   if (g_vertexBuffer == null) {
-//     initDrawTriangle3DUVNormal(); 
-//   }
+function drawTriangle3DUVNormal(vertices, uv, normals) {
+  var n = vertices.length / 3;
+  if (g_vertexBuffer == null) {
+    initDrawTriangle3DUVNormal(); 
+  }
   
-//   const verticesTyped = vertices instanceof Float32Array ? vertices : new Float32Array(vertices);
-//   const uvTyped = uv instanceof Float32Array ? uv : new Float32Array(uv);
-//   const normalsTyped = normals instanceof Float32Array ? normals : new Float32Array(normals);
+  const verticesTyped = vertices instanceof Float32Array ? vertices : new Float32Array(vertices);
+  const uvTyped = uv instanceof Float32Array ? uv : new Float32Array(uv);
+  const normalsTyped = normals instanceof Float32Array ? normals : new Float32Array(normals);
   
-//   gl.bindBuffer(gl.ARRAY_BUFFER, g_vertexBuffer);
-//   gl.bufferData(gl.ARRAY_BUFFER, verticesTyped, gl.DYNAMIC_DRAW);
-//   gl.bindBuffer(gl.ARRAY_BUFFER, g_uvBuffer);
-//   gl.bufferData(gl.ARRAY_BUFFER, uvTyped, gl.DYNAMIC_DRAW);
-//   gl.drawArrays(gl.TRIANGLES, 0, n);
-// }
+  gl.bindBuffer(gl.ARRAY_BUFFER, g_vertexBuffer);
+  gl.bufferData(gl.ARRAY_BUFFER, verticesTyped, gl.DYNAMIC_DRAW);
+  
+  gl.bindBuffer(gl.ARRAY_BUFFER, g_uvBuffer);
+  gl.bufferData(gl.ARRAY_BUFFER, uvTyped, gl.DYNAMIC_DRAW);
+  
+  // Add this missing section for normals
+  gl.bindBuffer(gl.ARRAY_BUFFER, g_normalBuffer);
+  gl.bufferData(gl.ARRAY_BUFFER, normalsTyped, gl.DYNAMIC_DRAW);
+  
+  gl.drawArrays(gl.TRIANGLES, 0, n);
+}

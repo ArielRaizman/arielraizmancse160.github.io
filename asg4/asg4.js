@@ -546,6 +546,14 @@ function renderShapes() {
   cube.matrix.scale(0.3, 0.3, 0.3);
   cube.matrix.translate(-0.5, -0.5, -0.5); // Center the cube
   cube.renderFast();
+
+  var sphere = new Sphere();
+  sphere.textureNum = -1;
+  sphere.color = [0.2, 0.2, 0.2, 1.0];
+  if (g_normalOn) { sphere.textureNum = -3; }
+  sphere.matrix.scale(0.3, 0.3, 0.3);
+  sphere.matrix.translate(2, 0.5, 0);
+  sphere.render();
 }
 
 function drawSeaLemons() {
