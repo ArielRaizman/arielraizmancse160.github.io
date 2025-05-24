@@ -9,6 +9,7 @@ var VSHADER_SOURCE =
   attribute vec3 a_Normal;
   varying vec2 v_UV;
   varying vec3 v_Normal; 
+  varying vec4 v_VertPos;
   uniform mat4  u_ModelMatrix;
   uniform mat4 u_GlobalRotationMatrix;
   uniform mat4 u_ViewMatrix;
@@ -17,6 +18,7 @@ var VSHADER_SOURCE =
     gl_Position = u_ProjectionMatrix* u_ViewMatrix* u_GlobalRotationMatrix * u_ModelMatrix * a_Position;
     v_UV = a_UV;
     v_Normal = a_Normal;
+    v_VertPos = u_ModelMatrix * a_Position;
   }`
 
 // Fragment shader program
@@ -24,14 +26,17 @@ var FSHADER_SOURCE =
   `precision mediump float;
   varying vec2 v_UV;
   varying vec3 v_Normal;
+  varying vec4 v_VertPos;
   uniform vec4 u_FragColor;
   uniform sampler2D u_Sampler0;
   uniform sampler2D u_Sampler1;
   uniform int u_whichTexture;
+  uniform vec3 u_LightPos;
+  uniform vec3 u_CameraPos;
+  uniform bool u_LightingOn;
+  uniform vec3 u_LightColor;  
   void main() {
-    // gl_FragColor = u_FragColor;
-    // gl_FragColor = vec4(v_UV,1,1);
-    // gl_FragColor = texture2D(u_Sampler0, v_UV);
+    // Set the base color based on texture/color settings
     if (u_whichTexture == -2) {
       gl_FragColor = u_FragColor;
     } else if (u_whichTexture == -1) {
@@ -46,6 +51,29 @@ var FSHADER_SOURCE =
     else {
       gl_FragColor = vec4(1.0, 0.2, 0.2, 1.0);
     }
+    
+    if (u_LightingOn) {
+      vec3 lightVector = u_LightPos - vec3(v_VertPos);
+      float r = length(lightVector);
+      vec3 L = normalize(lightVector);
+      vec3 N = normalize(v_Normal);
+      float NdotL = max(dot(N, L), 0.0);
+  
+      // Use light color in lighting calculations
+      vec3 diffuse = vec3(gl_FragColor) * NdotL * u_LightColor;
+      vec3 ambient = vec3(gl_FragColor) * 0.3;
+      
+      if (u_whichTexture == -1 || u_whichTexture == -2) {
+        vec3 R = reflect(-L, N);
+        vec3 E = normalize(u_CameraPos - vec3(v_VertPos));
+        float specular = pow(max(dot(E, R), 0.0), 32.0);
+        gl_FragColor = vec4(specular * u_LightColor + diffuse + ambient, 1.0);  
+      } else {
+        // No specular for textured objects
+        gl_FragColor = vec4(diffuse + ambient, 1.0);
+      }
+    }
+    // If lighting is off, the original color is used without modification
   }`  
 
 let canvas;
@@ -76,6 +104,12 @@ let u_ProjectionMatrix;
 let g_camera;
 let g_seaLemons = [];
 let g_normalOn = false;
+let g_lightPos = [0,1,-2];
+let u_lightPos;
+let u_cameraPos;
+let g_lightingOn = true; 
+let u_lightingOn;
+let g_lightColor = [1, 1, 1, 1]; 
 
 // Object Pooling 
 let g_kelpStem = null;
@@ -188,6 +222,29 @@ function connectVariablesToGLSL() {
     return;
   }
 
+  u_lightPos = gl.getUniformLocation(gl.program, 'u_LightPos');
+  if (!u_lightPos) {
+    console.log('Failed to get the storage location of u_LightPos');
+    return;
+  }
+
+  u_cameraPos = gl.getUniformLocation(gl.program, 'u_CameraPos');
+  if (!u_cameraPos) {
+    console.log('Failed to get the storage location of u_CameraPos');
+    return;
+  }
+
+  u_lightingOn = gl.getUniformLocation(gl.program, 'u_LightingOn');
+  if (!u_lightingOn) {
+    console.log('Failed to get the storage location of u_LightingOn');
+    return;
+  }
+
+  u_lightColor = gl.getUniformLocation(gl.program, 'u_LightColor');
+  if (!u_lightColor) {
+    console.log('Failed to get the storage location of u_LightColor');
+    return;
+  }
 }
 
 function htmlUI() {
@@ -195,9 +252,17 @@ function htmlUI() {
   document.getElementById('off').onclick = function() { g_animation = false; };
   document.getElementById('normalon').onclick = function() { g_normalOn = true; }
   document.getElementById('normaloff').onclick = function() { g_normalOn = false; }
+  document.getElementById('lighton').onclick = function() { g_lightingOn = true; }
+  document.getElementById('lightoff').onclick = function() { g_lightingOn = false; }
+  document.getElementById('lightR').addEventListener('input', function() { g_lightColor[0] = this.value/100; renderShapes();});
+  document.getElementById('lightG').addEventListener('input', function() { g_lightColor[1] = this.value/100; renderShapes();});
+  document.getElementById('lightB').addEventListener('input', function() { g_lightColor[2] = this.value/100; renderShapes();});
 
   document.getElementById('eyerotation').addEventListener('mousemove', function() { g_eyeRotation = this.value; });
   document.getElementById('scrunchslide').addEventListener('mousemove', function() { g_userScrunch = this.value; });
+  document.getElementById('lightX').addEventListener('mousemove', function() { g_lightPos[0] = this.value/100; renderShapes();});
+  document.getElementById('lightY').addEventListener('mousemove', function() { g_lightPos[1] = this.value/100; renderShapes();});
+  document.getElementById('lightZ').addEventListener('mousemove', function() { g_lightPos[2] = this.value/100; renderShapes();});
   // document.getElementById('viewangle').addEventListener('mousemove', function() { g_globalAngle = this.value; });
 
 }
@@ -284,18 +349,6 @@ function mouseNavigation() {
       renderShapes();
     }
   };
-
-  // canvas.onwheel = function(ev) {
-  //   ev.preventDefault(); 
-    
-  //   if (ev.deltaY > 0) {
-  //     g_scale = Math.min(5.0, g_scale + g_zoomSpeed)
-  //   } else {
-  //     g_scale = Math.max(0.1, g_scale - g_zoomSpeed)
-  //   }
-
-  //   renderShapes();
-  // }
 }
 
 function initObjectPool() {
@@ -315,114 +368,6 @@ function initObjectPool() {
   // Initialize reusable matrix
   g_tempMatrix = new Matrix4();
 }
-
-// var g_map = [
-//   [3,3,3,3,3,2,2,2,2,1,1,1,1,1,1,1,1,1,1,1,1,1,1,2,2,2,3,3,3,3,3,3],
-//   [3,4,4,3,2,2,1,1,1,1,0,0,0,0,0,0,0,0,0,0,0,0,1,1,2,2,3,3,4,4,3,3],
-//   [3,4,4,3,2,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,2,3,3,4,4,3,3],
-//   [3,3,3,2,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,2,2,3,3,3,3,3],
-//   [2,2,2,1,1,0,0,0,0,0,0,0,0,0,0,1,1,0,0,0,0,0,0,0,0,1,2,2,2,3,3,2],
-//   [2,1,1,1,0,0,0,0,0,0,0,0,0,0,0,1,2,1,0,0,0,0,0,0,0,0,1,1,2,2,2,2],
-//   [1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,1,0,0,0,0,0,0,0,0,0,1,1,2,2,1],
-//   [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,1,1],
-//   [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,1],
-//   [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1],
-//   [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
-//   [1,0,0,0,0,0,0,0,0,0,0,0,1,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
-//   [1,0,0,0,0,0,0,0,0,0,0,1,2,2,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
-//   [1,0,0,0,0,0,0,0,0,0,1,2,3,2,2,1,0,0,0,[1,1],0,0,0,0,0,0,0,0,0,0,0,1],
-//   [1,0,0,0,0,0,0,0,0,0,1,2,2,2,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
-//   [1,0,0,0,0,0,0,0,0,0,1,1,1,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
-//   [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
-//   [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
-//   [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
-//   [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
-//   [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,2,2,1,0,0,0,0,0,0,1],
-//   [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,2,2,3,4,3,2,1,0,0,0,0,0,1],
-//   [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,2,3,3,2,1,0,0,0,0,0,0,1],
-//   [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,2,2,1,0,0,0,0,0,0,0,1],
-//   [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,0,0,0,0,0,0,0,0,1],
-//   [1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1],
-//   [2,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,2],
-//   [2,2,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,2,2],
-//   [3,2,2,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,2,2,3],
-//   [3,3,2,2,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,2,2,3,3]
-// ]
-
-// function drawMap() {
-//   var block = new Cube();
-//   block.color = [0.4, 0.3, 0.2, 1.0];
-  
-//   for (let x = 0; x < g_map.length; x++) {
-//     for (let y = 0; y < g_map[x].length; y++) {
-//       let cellValue = g_map[x][y];
-//       let height = 0;
-//       let placeKelp = false;
-      
-//       if (Array.isArray(cellValue)) {
-//         height = cellValue[0];
-//         // console.log("block placed?", cellValue[0]);
-//         placeKelp = cellValue[1] === 1;
-//       } else {
-//         height = cellValue;
-//       }
-      
-//       if (height === 0) continue;
-      
-//       for (let h = 0; h < height; h++) {
-//         block.matrix.setIdentity();
-//         block.matrix.translate(0, -0.1 + (h * 0.3), 0); 
-//         block.matrix.scale(0.3, 0.3, 0.3);
-//         block.matrix.translate(x - 16, 0, y - 16); 
-//         block.renderFast();
-//       }
-      
-//       // Place kelp if specified
-//       // if (placeKelp) {
-//       //   // Position kelp on top of the highest block
-//       //   const kelpX = (x - 16) / 3;
-//       //   const kelpY = -0.1 + (height * 0.3);
-//       //   const kelpZ = (y - 16) / 3;
-        
-//       //   kelpStalk(kelpX, kelpY, kelpZ);
-//       // }
-//     }
-//   }
-// }
-
-// function initSeaLemons() {
-//   g_seaLemons.push({
-//     position: [0, 0, 0],
-//     scale: 0.4,
-//     rotX: 0,
-//     rotY: 320,
-//     rotZ: 0
-//   });
-  
-//   g_seaLemons.push({
-//     position: [3, 0, 0.5],
-//     scale: 0.4,
-//     rotX: 0,
-//     rotY: 200,
-//     rotZ: 0
-//   });
-//   g_seaLemons.push({
-//     position: [-3, 0.3, 3.5],
-//     scale: 0.4,
-//     rotX: 0,
-//     rotY: 200,
-//     rotZ: 0
-//   });
-
-//   g_seaLemons.push({
-//     position: [-2.5, 0, -3.5],
-//     scale: 0.4,
-//     rotX: 0,
-//     rotY: 260,
-//     rotZ: 0
-//   });
-//   sendTextToHTML("seaLemonCount", "Sea Lemons Left: " + (g_seaLemons.length));
-// }
 
 function main() {
 
@@ -496,6 +441,8 @@ function updateAnimationAngle() {
     const cosValue = Math.cos(g_seconds);
     g_jointSlider = 45*sinValue;
     g_purpleJoint = 45*cosValue;
+
+    g_lightPos[0] = cosValue
   }
 }
 
@@ -518,14 +465,18 @@ function renderShapes() {
 
   gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT); 
 
-  
+  gl.uniform3f(u_lightPos, g_lightPos[0], g_lightPos[1], g_lightPos[2]);
+  gl.uniform3f(u_cameraPos, g_camera.eye.elements[0], g_camera.eye.elements[1], g_camera.eye.elements[2]); 
+  gl.uniform1i(u_lightingOn, g_lightingOn);
+  gl.uniform3f(u_lightColor, g_lightColor[0], g_lightColor[1], g_lightColor[2]);
+
   // drawMap();
   // drawBlocks();
   // kelpStalk(-3,-0.2,4);
   // kelpStalk(-13,-0.2,-6);
   // kelpStalk(15,0.8,10);
   // drawSeaLemons();
-  // seaLemon()
+  seaLemon()
 
   var ground = new Cube();
   ground.textureNum = 1;
@@ -539,12 +490,12 @@ function renderShapes() {
 
   var cube = new Cube();
   cube.color = [0.2, 0.2, 0.2, 1.0];
-  cube.textureNum = 0;
+  cube.textureNum = -2;
   if (g_normalOn) { cube.textureNum = -3; }
   cube.matrix.setIdentity();
-  cube.matrix.translate(0, 0, 0);
+  cube.matrix.translate(1, 1, 1);
   cube.matrix.scale(0.3, 0.3, 0.3);
-  cube.matrix.translate(-0.5, -0.5, -0.5); // Center the cube
+  cube.matrix.translate(-0.5, -0.5, -0.5); 
   cube.renderFast();
 
   var sphere = new Sphere();
@@ -554,6 +505,13 @@ function renderShapes() {
   sphere.matrix.scale(0.3, 0.3, 0.3);
   sphere.matrix.translate(2, 0.5, 0);
   sphere.render();
+
+  var light = new Cube();
+  light.color = g_lightColor; // Use the variable instead of hard-coded color
+  light.matrix.translate(g_lightPos[0], g_lightPos[1], g_lightPos[2]);
+  light.matrix.scale(-0.1, -0.1, -0.1);
+  light.matrix.translate(-0.5, -0.5, -0.5);
+  light.renderFast();
 }
 
 function drawSeaLemons() {
@@ -842,7 +800,7 @@ function seaLemon(x = 0, y = 0, z = 0, scale = 1.0, rotX = 0, rotY = 0, rotZ = 0
   // base layer
   g_seaLemonParts.baseCube.matrix.setIdentity();
   g_seaLemonParts.baseCube.matrix.multiply(baseMatrix);
-  g_seaLemonParts.baseCube.textureNum = -2;
+  g_seaLemonParts.baseCube.textureNum = g_normalOn ? -3 : -2; 
   g_seaLemonParts.baseCube.color = [0.9, 0.8, 0.2, 1.0]; 
   g_seaLemonParts.baseCube.matrix.translate(-0.2 - offsetX/2, -0.1, -0.4 - offsetZ);
   g_seaLemonParts.baseCube.matrix.translate(0, 0, 0.8 * (1 - breatheScaleZ) * widthScale/2);
@@ -854,12 +812,14 @@ function seaLemon(x = 0, y = 0, z = 0, scale = 1.0, rotX = 0, rotY = 0, rotZ = 0
 
   // mid layer
   g_seaLemonParts.middleCube.matrix.set(g_tempMatrix);
+  g_seaLemonParts.middleCube.textureNum = g_normalOn ? -3 : -2; 
   g_seaLemonParts.middleCube.color = [0.9, 0.75, 0.15, 1.0]; 
   g_seaLemonParts.middleCube.matrix.translate(0.06, 0.5, 0.03); 
   g_seaLemonParts.middleCube.matrix.scale(0.7/0.8, (0.12/0.1) * breatheScaleY, 1.4/1.6);  
   g_seaLemonParts.middleCube.renderFast();
   
   // top layer
+  g_seaLemonParts.topCube.textureNum = g_normalOn ? -3 : -2; 
   g_seaLemonParts.topCube.color = [0.85, 0.7, 0.1, 1.0]; 
   g_seaLemonParts.topCube.matrix.set(g_tempMatrix);
   g_seaLemonParts.topCube.matrix.translate(0.19, 0.72, 0.1);  
@@ -867,6 +827,7 @@ function seaLemon(x = 0, y = 0, z = 0, scale = 1.0, rotX = 0, rotY = 0, rotZ = 0
   g_seaLemonParts.topCube.renderFast();
 
   // Left eye
+  g_seaLemonParts.leftEye.textureNum = g_normalOn ? -3 : -2;
   g_seaLemonParts.leftEye.color = [0.9, 0.8, 0.2, 1.0];
   g_seaLemonParts.leftEye.matrix.set(g_tempMatrix);
   g_seaLemonParts.leftEye.matrix.translate(0.25, 2.5, 0.1);
@@ -877,6 +838,7 @@ function seaLemon(x = 0, y = 0, z = 0, scale = 1.0, rotX = 0, rotY = 0, rotZ = 0
   g_seaLemonParts.leftEye.renderFast();
   
   // Right eye
+  g_seaLemonParts.rightEye.textureNum = g_normalOn ? -3 : -2; 
   g_seaLemonParts.rightEye.color = [0.9, 0.8, 0.2, 1.0];
   g_seaLemonParts.rightEye.matrix.set(g_tempMatrix);
   g_seaLemonParts.rightEye.matrix.translate(0.75, 2.5, 0.1); 
@@ -900,6 +862,7 @@ function seaLemon(x = 0, y = 0, z = 0, scale = 1.0, rotX = 0, rotY = 0, rotZ = 0
       const x = Math.cos(angle) * gillRadius;
       const z = Math.sin(angle) * (gillRadius/2);
       
+      g_seaLemonParts.gill.textureNum = g_normalOn ? -3 : -2; 
       g_seaLemonParts.gill.color = baseGillColor;  
       
       g_seaLemonParts.gill.matrix.set(g_tempMatrix);
