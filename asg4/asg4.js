@@ -172,6 +172,8 @@ let g_tempMatrix = null;
 
 let g_blocks = []; // Array to store placed blocks
 
+// let g_headModel = null;
+
 function setupWebGL() {
   // Retrieve <canvas> element
   canvas = document.getElementById('webgl');
@@ -422,6 +424,9 @@ function initObjectPool() {
   g_seaLemonParts.rightEye = new Leaf();
   g_seaLemonParts.gill = new Leaf();
   
+  // // Initialize 3D model
+  // g_headModel = new Model(gl, 'head.obj');
+  
   // Initialize reusable matrix
   g_tempMatrix = new Matrix4();
 }
@@ -587,6 +592,31 @@ function renderShapes() {
     spotCone.matrix.translate(-0.5, -0.5, -0.5);
     spotCone.renderFast();
   }
+
+  // // Head model rendering
+  // if (g_headModel && g_headModel.loaded) {
+  //   // Set model matrix for positioning and scaling
+  //   g_headModel.matrix.setIdentity();
+  //   g_headModel.matrix.translate(-1.0, 0.5, 0.5); // Position the head
+    
+  //   // Add some animation if you want
+  //   const rotationY = 45 * Math.sin(g_seconds * 0.5);
+  //   g_headModel.matrix.rotate(rotationY, 0, 1, 0);
+    
+  //   g_headModel.matrix.scale(0.2, 0.2, 0.2); // Scale to appropriate size
+    
+  //   // Set the color - can be changed to your preference
+  //   g_headModel.color = [0.8, 0.6, 0.6, 1.0]; // Flesh tone
+    
+  //   // If normalOn is set, show normals instead
+  //   if (g_normalOn) {
+  //     gl.uniform1i(u_whichTexture, -3);
+  //   } else {
+  //     gl.uniform1i(u_whichTexture, -2); // Use color (no texture)
+  //   }
+    
+  //   g_headModel.render(gl, gl.program);
+  // }
 }
 
 function drawSeaLemons() {
